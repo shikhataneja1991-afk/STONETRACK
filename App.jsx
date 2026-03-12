@@ -1343,28 +1343,44 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
           </table></div>}
       </>} />}
 
-      {staffPinOpen && <Mdl title="Set Staff PIN" sub="Staff will use this 4-digit PIN to login" onClose={() => setStaffPinOpen(false)} ch={<>
-        <div style={{ marginBottom: 16 }}>
-          {business.staff_pin
-            ? <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: "#16a34a", fontWeight: 600 }}>✓ Current Staff PIN: <span style={{ fontFamily: "monospace", fontSize: 18, letterSpacing: 4 }}>{business.staff_pin}</span></div>
-            : <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: "#92400e" }}>⚠ No Staff PIN set yet. Staff cannot login until you set one.</div>}
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>New 4-digit PIN</div>
-          <input value={newStaffPin} onChange={e => setNewStaffPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-            placeholder="e.g. 1234" maxLength={4}
-            style={{ width: "100%", padding: "12px 14px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 24, fontFamily: "monospace", letterSpacing: 8, outline: "none", textAlign: "center" }} />
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>Share this PIN with your staff. Change it anytime.</div>
+      {staffPinOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.45)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && setStaffPinOpen(false)}>
+          <div style={{ background: "#fff", borderRadius: "16px 16px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 520, boxShadow: "0 -8px 40px rgba(15,36,68,0.2)" }}>
+            <div style={{ width: 40, height: 4, background: "#e2e8f0", borderRadius: 2, margin: "0 auto 16px" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>Set Staff PIN</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>Staff will use this 4-digit PIN to login</div>
+              </div>
+              <button onClick={() => setStaffPinOpen(false)} style={{ background: "#f1f5f9", border: "none", borderRadius: 8, width: 36, height: 36, cursor: "pointer", fontSize: 15, color: "#64748b" }}>✕</button>
+            </div>
+            <div style={{ height: 1, background: "#f1f5f9", marginBottom: 18 }} />
+            {business.staff_pin
+              ? <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: "#16a34a", fontWeight: 600 }}>✓ Current PIN: <span style={{ fontFamily: "monospace", fontSize: 20, letterSpacing: 6 }}>{business.staff_pin}</span></div>
+              : <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: "#92400e" }}>⚠ No Staff PIN set yet.</div>}
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8 }}>New 4-digit PIN</div>
+            <input
+              type="number"
+              value={newStaffPin}
+              onChange={e => setNewStaffPin(e.target.value.slice(0, 4))}
+              placeholder="e.g. 5678"
+              maxLength={4}
+              style={{ width: "100%", padding: "14px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 28, fontFamily: "monospace", letterSpacing: 10, outline: "none", textAlign: "center", marginBottom: 8 }}
+            />
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 18 }}>Share this PIN with your staff only. Change it anytime.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStaffPinOpen(false)} style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={async () => {
+                if (newStaffPin.length !== 4) { notify("Enter exactly 4 digits", "error"); return; }
+                await sb.from("businesses").update({ staff_pin: newStaffPin }).eq("id", business.id);
+                business.staff_pin = newStaffPin;
+                setStaffPinOpen(false); setNewStaffPin("");
+                notify(`✓ Staff PIN set to ${newStaffPin}`);
+              }} style={{ flex: 1, background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Save PIN</button>
+            </div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <Btn ch="Cancel" v="g" onClick={() => setStaffPinOpen(false)} />
-          <Btn ch="Save PIN" onClick={async () => {
-            if (newStaffPin.length !== 4) { notify("Enter a 4-digit PIN", "error"); return; }
-            await sb.from("businesses").update({ staff_pin: newStaffPin }).eq("id", business.id);
-            business.staff_pin = newStaffPin;
-            setStaffPinOpen(false); setNewStaffPin("");
-            notify(`Staff PIN set to ${newStaffPin}`);
-          }} />
-        </div>
-      </>} />}
+      )}
 
       {printTarget && <QRLabel slab={printTarget} onClose={() => setPrintTarget(null)} />}
       {invoiceView && <InvoiceView sale={invoiceView} onClose={() => setInvoiceView(null)} />}
