@@ -529,20 +529,30 @@ export default function StoneTrack() {
         <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 14 }}>
           <button onClick={() => setLoginMode("owner")}
             style={{ background: "#fff", border: "none", borderRadius: 16, padding: "22px 24px", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 48, height: 48, background: "#1e3a5f", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👑</div>
+            <div style={{ width: 48, height: 48, background: "#f0f6ff", border: "2px solid #dbeafe", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+              </svg>
+            </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>Owner Login</div>
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Full access — inventory, sales, reports</div>
             </div>
+            <svg style={{ marginLeft: "auto" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
 
           <button onClick={() => setLoginMode("staff")}
             style={{ background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: "22px 24px", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 48, height: 48, background: "#1e4f8f", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👷</div>
+            <div style={{ width: 48, height: 48, background: "rgba(255,255,255,0.08)", border: "2px solid rgba(255,255,255,0.15)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, color: "#fff" }}>Staff Login</div>
               <div style={{ fontSize: 12, color: "#93c5fd", marginTop: 2 }}>Enter your 4-digit staff PIN</div>
             </div>
+            <svg style={{ marginLeft: "auto" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
       </div>
@@ -831,7 +841,10 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {stats.totalDue > 0 && <div onClick={() => setTab("payments")} style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>💳 {fmtINR(Math.round(stats.totalDue))}</div>}
               {(stats.low + stats.out) > 0 && <div onClick={() => setTab("inventory")} style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>⚠ {stats.low + stats.out}</div>}
-              <button onClick={() => setStaffPinOpen(true)} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34 }}>👷 Staff PIN</button>
+              <button onClick={() => setStaffPinOpen(true)} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34, display: "flex", alignItems: "center", gap: 5 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Staff PIN
+              </button>
               <button onClick={() => sb.auth.signOut()} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34 }}>🔒 Logout</button>
             </div>
           </div>
