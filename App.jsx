@@ -69,7 +69,7 @@ const Loader = ({ msg = "Loading..." }) => (
 );
 
 // ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
-const AuthScreen = ({ onAuth }) => {
+const AuthScreen = ({ onBack }) => {
   const [mode, setMode] = useState("login"); // login | signup
   const [form, setForm] = useState({ email: "", password: "", businessName: "", ownerName: "", phone: "", city: "" });
   const [loading, setLoading] = useState(false);
@@ -272,11 +272,223 @@ const InvoiceView = ({ sale, onClose }) => {
   );
 };
 
+// ─── STAFF PIN LOGIN ──────────────────────────────────────────────────────────
+const StaffPinLogin = ({ onSuccess }) => {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [bizName, setBizName] = useState("");
+
+  const handlePin = async (p) => {
+    const next = pin + p;
+    setPin(next);
+    if (next.length === 4) {
+      setLoading(true); setError("");
+      // Find business with this staff PIN
+      const { data } = await sb.from("businesses").select("*").eq("staff_pin", next).single();
+      if (data) {
+        setBizName(data.business_name);
+        setTimeout(() => { onSuccess(data); setLoading(false); }, 500);
+      } else {
+        setError("Wrong PIN. Try again.");
+        setPin(""); setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0f2240", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',sans-serif", padding: 20 }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@500&display=swap');*{box-sizing:border-box}@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
+      <div style={{ width: 44, height: 44, background: "#fff", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+        <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
+      </div>
+      <div style={{ color: "#fff", fontWeight: 800, fontSize: 20, letterSpacing: 2, marginBottom: 4 }}>STONETRACK</div>
+      <div style={{ color: "#64748b", fontSize: 12, marginBottom: 32 }}>STAFF ACCESS</div>
+      <div style={{ background: "#1a2f4a", borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 300 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: "#93c5fd", fontWeight: 600, marginBottom: 16 }}>Enter Staff PIN</div>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", animation: error ? "shake 0.4s ease" : "none" }}>
+            {[0,1,2,3].map(i => (
+              <div key={i} style={{ width: 14, height: 14, borderRadius: "50%", background: pin.length > i ? "#3b82f6" : "#2d4a6a", border: "2px solid #3b82f650", transition: "all 0.15s" }} />
+            ))}
+          </div>
+          {error && <div style={{ color: "#f87171", fontSize: 12, marginTop: 10, fontWeight: 600 }}>{error}</div>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          {["1","2","3","4","5","6","7","8","9","","0","DEL"].map(k => (
+            <button key={k} onClick={() => { if (!k) return; if (k === "DEL") { setPin(p => p.slice(0,-1)); setError(""); } else if (pin.length < 4) handlePin(k); }}
+              style={{ background: k === "DEL" ? "#2d4a6a" : k === "" ? "transparent" : "#243d5c", border: k === "" ? "none" : "1px solid #2d4a6a", color: k === "DEL" ? "#94a3b8" : "#fff", borderRadius: 12, padding: "16px 0", fontSize: k === "DEL" ? 12 : 22, fontWeight: 700, cursor: k === "" ? "default" : "pointer", fontFamily: "'DM Mono',monospace", minHeight: 56 }}>{k}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ color: "#334155", fontSize: 11, marginTop: 20 }}>Ask your manager for the Staff PIN</div>
+    </div>
+  );
+};
+
+// ─── STAFF APP ────────────────────────────────────────────────────────────────
+function StaffApp({ business, onExit }) {
+  const [slabs, setSlabs] = useState([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [notif, setNotif] = useState(null);
+  const [printTarget, setPrintTarget] = useState(null);
+  const [reserveTarget, setReserveTarget] = useState(null);
+  const [reserveName, setReserveName] = useState("");
+  const [dispatchTarget, setDispatchTarget] = useState(null);
+
+  const notify = (msg, type = "success") => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 3000); };
+
+  useEffect(() => {
+    sb.from("slabs").select("*").eq("business_id", business.id).order("name").then(({ data }) => { setSlabs(data || []); setLoading(false); });
+  }, [business.id]);
+
+  const filtered = slabs.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    (s.barcode || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const markDispatched = async (slab) => {
+    const newQty = Math.max(0, slab.qty - 1);
+    const newStatus = getStatus(newQty, slab.threshold);
+    await sb.from("slabs").update({ qty: newQty, status: newStatus, reserved_for: null }).eq("id", slab.id);
+    setSlabs(p => p.map(s => s.id === slab.id ? { ...s, qty: newQty, status: newStatus, reserved_for: null } : s));
+    setDispatchTarget(null);
+    notify(`✓ ${slab.name} marked as dispatched`);
+  };
+
+  const reserveSlab = async () => {
+    if (!reserveName.trim()) return;
+    await sb.from("slabs").update({ reserved_for: reserveName }).eq("id", reserveTarget.id);
+    setSlabs(p => p.map(s => s.id === reserveTarget.id ? { ...s, reserved_for: reserveName } : s));
+    setReserveTarget(null); setReserveName("");
+    notify(`Reserved for ${reserveName}`);
+  };
+
+  if (loading) return <Loader msg="Loading inventory..." />;
+
+  return (
+    <div style={{ fontFamily: "'DM Sans',sans-serif", background: "#f0f6ff", minHeight: "100vh" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
+
+      {notif && <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 999, background: notif.type === "error" ? "#fef2f2" : "#f0fdf4", border: `1px solid ${notif.type === "error" ? "#fca5a5" : "#86efac"}`, color: notif.type === "error" ? "#dc2626" : "#16a34a", padding: "10px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>{notif.msg}</div>}
+
+      {/* Header */}
+      <header style={{ background: "#1e3a5f", padding: "12px 16px", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 16px rgba(15,36,68,0.3)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 32, height: 32, background: "#fff", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
+            </div>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>STONETRACK</div>
+              <div style={{ color: "#93c5fd", fontSize: 9, letterSpacing: 1 }}>{business.business_name} · STAFF</div>
+            </div>
+          </div>
+          <button onClick={onExit} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🔒 Exit</button>
+        </div>
+        {/* Search */}
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search by name or barcode..."
+          style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "none", fontSize: 15, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "rgba(255,255,255,0.12)", color: "#fff" }} />
+      </header>
+
+      {/* Stats bar */}
+      <div style={{ background: "#1e3a5f", padding: "8px 16px 12px", display: "flex", gap: 16 }}>
+        {[["Total", slabs.length, "#93c5fd"], ["In Stock", slabs.filter(s => s.status === "In Stock").length, "#86efac"], ["Low", slabs.filter(s => s.status === "Low Stock").length, "#fcd34d"], ["Out", slabs.filter(s => s.status === "Out of Stock").length, "#fca5a5"]].map(([l, v, c]) => (
+          <div key={l} style={{ textAlign: "center" }}>
+            <div style={{ color: c, fontWeight: 800, fontSize: 18 }}>{v}</div>
+            <div style={{ color: "#64748b", fontSize: 10, fontWeight: 600 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Slab Cards */}
+      <div style={{ padding: "14px 14px 90px" }}>
+        {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No slabs found</div>}
+        {filtered.map(s => (
+          <div key={s.id} style={{ background: "#fff", borderRadius: 12, padding: 16, marginBottom: 10, boxShadow: "0 1px 8px rgba(30,58,95,0.08)", borderLeft: `4px solid ${stc(s.status)}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>{s.name}</div>
+                <div style={{ fontFamily: "monospace", fontSize: 11, color: "#94a3b8", background: "#f0f6ff", padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 2 }}>{s.barcode}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontWeight: 900, fontSize: 28, color: stc(s.status), lineHeight: 1 }}>{s.qty}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>slabs</div>
+              </div>
+            </div>
+
+            {/* Info row */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <span style={{ background: "#f0f6ff", color: "#1e3a5f", borderRadius: 6, padding: "3px 8px", fontSize: 12, fontWeight: 600 }}>📍 Block {s.block} · R{s.row_no} · S{s.slot_no}</span>
+              <span style={{ background: "#f0f6ff", color: "#475569", borderRadius: 6, padding: "3px 8px", fontSize: 12 }}>{s.type} · {s.finish}</span>
+              <span style={{ background: stb(s.status), color: stc(s.status), borderRadius: 6, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>{s.status}</span>
+              {s.reserved_for && <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "3px 8px", fontSize: 12, fontWeight: 700 }}>📌 Reserved: {s.reserved_for}</span>}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setDispatchTarget(s)} disabled={s.qty === 0}
+                style={{ flex: 1, background: s.qty === 0 ? "#e2e8f0" : "#059669", color: s.qty === 0 ? "#94a3b8" : "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: s.qty === 0 ? "not-allowed" : "pointer", minHeight: 42 }}>
+                ✓ Dispatch
+              </button>
+              <button onClick={() => { setReserveTarget(s); setReserveName(s.reserved_for || ""); }}
+                style={{ flex: 1, background: s.reserved_for ? "#fef3c7" : "#f1f5f9", color: s.reserved_for ? "#92400e" : "#475569", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", minHeight: 42 }}>
+                📌 {s.reserved_for ? "Change" : "Reserve"}
+              </button>
+              <button onClick={() => setPrintTarget(s)}
+                style={{ background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", minHeight: 42 }}>
+                🖨 QR
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Dispatch Confirm Modal */}
+      {dispatchTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.5)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: "16px 16px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 480 }}>
+            <div style={{ width: 40, height: 4, background: "#e2e8f0", borderRadius: 2, margin: "0 auto 16px" }} />
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f", marginBottom: 6 }}>Confirm Dispatch</div>
+            <div style={{ color: "#64748b", fontSize: 13, marginBottom: 20 }}>Mark 1 slab of <strong>{dispatchTarget.name}</strong> as dispatched? Stock will reduce from {dispatchTarget.qty} to {dispatchTarget.qty - 1}.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setDispatchTarget(null)} style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => markDispatched(dispatchTarget)} style={{ flex: 1, background: "#059669", color: "#fff", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>✓ Confirm Dispatch</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reserve Modal */}
+      {reserveTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.5)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: "16px 16px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: 480 }}>
+            <div style={{ width: 40, height: 4, background: "#e2e8f0", borderRadius: 2, margin: "0 auto 16px" }} />
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f", marginBottom: 16 }}>Reserve Slab</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>Customer Name</div>
+            <input value={reserveName} onChange={e => setReserveName(e.target.value)} placeholder="Enter customer name..."
+              style={{ width: "100%", padding: "12px 14px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 16, fontFamily: "'DM Sans',sans-serif", outline: "none", marginBottom: 16 }} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setReserveTarget(null)} style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={reserveSlab} style={{ flex: 1, background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Save Reservation</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {printTarget && <QRLabel slab={printTarget} onClose={() => setPrintTarget(null)} />}
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function StoneTrack() {
   const [session, setSession] = useState(null);
   const [business, setBusiness] = useState(null);
   const [appLoading, setAppLoading] = useState(true);
+  const [loginMode, setLoginMode] = useState("choose"); // choose | owner | staff
+  const [staffBusiness, setStaffBusiness] = useState(null);
 
   useEffect(() => {
     sb.auth.getSession().then(({ data: { session } }) => { setSession(session); if (!session) setAppLoading(false); });
@@ -294,8 +506,49 @@ export default function StoneTrack() {
     setAppLoading(false);
   };
 
+  // Staff logged in via PIN
+  if (staffBusiness) return <StaffApp business={staffBusiness} onExit={() => setStaffBusiness(null)} />;
+
   if (appLoading) return <Loader msg="Loading StoneTrack..." />;
-  if (!session) return <AuthScreen onAuth={() => {}} />;
+
+  // Not logged in — show choose screen
+  if (!session) {
+    if (loginMode === "staff") return <StaffPinLogin onSuccess={biz => setStaffBusiness(biz)} />;
+    if (loginMode === "owner") return <AuthScreen onBack={() => setLoginMode("choose")} />;
+
+    // Choose screen
+    return (
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f2240 0%, #1e3a5f 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 16px", fontFamily: "'DM Sans',sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap');*{box-sizing:border-box}`}</style>
+        <div style={{ width: 56, height: 56, background: "#fff", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+          <svg width="32" height="32" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
+        </div>
+        <div style={{ color: "#fff", fontWeight: 900, fontSize: 26, letterSpacing: 3, marginBottom: 4 }}>STONETRACK</div>
+        <div style={{ color: "#93c5fd", fontSize: 12, letterSpacing: 1.5, marginBottom: 48 }}>MARBLE & GRANITE MANAGEMENT</div>
+
+        <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 14 }}>
+          <button onClick={() => setLoginMode("owner")}
+            style={{ background: "#fff", border: "none", borderRadius: 16, padding: "22px 24px", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 48, height: 48, background: "#1e3a5f", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👑</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>Owner Login</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Full access — inventory, sales, reports</div>
+            </div>
+          </button>
+
+          <button onClick={() => setLoginMode("staff")}
+            style={{ background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.15)", borderRadius: 16, padding: "22px 24px", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 48, height: 48, background: "#1e4f8f", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👷</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#fff" }}>Staff Login</div>
+              <div style={{ fontSize: 12, color: "#93c5fd", marginTop: 2 }}>Enter your 4-digit staff PIN</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!business) return <Loader msg="Setting up your account..." />;
   return <OwnerApp session={session} business={business} onRefreshBusiness={loadBusiness} />;
 }
@@ -313,7 +566,8 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
   const [fStatus, setFStatus] = useState("All");
   const [fBlock, setFBlock] = useState("All");
   const [notif, setNotif] = useState(null);
-  const [yardBlock, setYardBlock] = useState(null);
+  const [staffPinOpen, setStaffPinOpen] = useState(false);
+  const [newStaffPin, setNewStaffPin] = useState("");
 
   // modals
   const [addSlabOpen, setAddSlabOpen] = useState(false);
@@ -577,6 +831,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {stats.totalDue > 0 && <div onClick={() => setTab("payments")} style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>💳 {fmtINR(Math.round(stats.totalDue))}</div>}
               {(stats.low + stats.out) > 0 && <div onClick={() => setTab("inventory")} style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>⚠ {stats.low + stats.out}</div>}
+              <button onClick={() => setStaffPinOpen(true)} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34 }}>👷 Staff PIN</button>
               <button onClick={() => sb.auth.signOut()} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34 }}>🔒 Logout</button>
             </div>
           </div>
@@ -1086,6 +1341,29 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               </tr>);
             })}</tbody>
           </table></div>}
+      </>} />}
+
+      {staffPinOpen && <Mdl title="Set Staff PIN" sub="Staff will use this 4-digit PIN to login" onClose={() => setStaffPinOpen(false)} ch={<>
+        <div style={{ marginBottom: 16 }}>
+          {business.staff_pin
+            ? <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: "#16a34a", fontWeight: 600 }}>✓ Current Staff PIN: <span style={{ fontFamily: "monospace", fontSize: 18, letterSpacing: 4 }}>{business.staff_pin}</span></div>
+            : <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, color: "#92400e" }}>⚠ No Staff PIN set yet. Staff cannot login until you set one.</div>}
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>New 4-digit PIN</div>
+          <input value={newStaffPin} onChange={e => setNewStaffPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="e.g. 1234" maxLength={4}
+            style={{ width: "100%", padding: "12px 14px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 24, fontFamily: "monospace", letterSpacing: 8, outline: "none", textAlign: "center" }} />
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>Share this PIN with your staff. Change it anytime.</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <Btn ch="Cancel" v="g" onClick={() => setStaffPinOpen(false)} />
+          <Btn ch="Save PIN" onClick={async () => {
+            if (newStaffPin.length !== 4) { notify("Enter a 4-digit PIN", "error"); return; }
+            await sb.from("businesses").update({ staff_pin: newStaffPin }).eq("id", business.id);
+            business.staff_pin = newStaffPin;
+            setStaffPinOpen(false); setNewStaffPin("");
+            notify(`Staff PIN set to ${newStaffPin}`);
+          }} />
+        </div>
       </>} />}
 
       {printTarget && <QRLabel slab={printTarget} onClose={() => setPrintTarget(null)} />}
