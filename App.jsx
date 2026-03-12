@@ -99,17 +99,11 @@ const AuthScreen = ({ onAuth }) => {
     setLoading(false);
   };
 
-  const F = ({ label, placeholder, type = "text", field, req }) => (
-    <div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 5 }}>{label}{req && <span style={{ color: "#dc2626" }}> *</span>}</div>
-      <input type={type} value={form[field]} onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))}
-        placeholder={placeholder} style={{ width: "100%", padding: "11px 13px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 15, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "#f8faff" }}
-        onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
-    </div>
-  );
+  const inputStyle = { width: "100%", padding: "11px 13px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 15, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "#f8faff" };
+  const labelStyle = { fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 5, display: "block" };
 
   return (
-    <div style={{ minHeight: "100vh", minHeight: "100dvh", background: "linear-gradient(135deg, #0f2240 0%, #1e3a5f 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 16px", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f2240 0%, #1e3a5f 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 16px", fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box}`}</style>
 
       <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -136,15 +130,21 @@ const AuthScreen = ({ onAuth }) => {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {mode === "signup" && <>
-            <F label="Business Name" placeholder="e.g. Sharma Marble Works" field="businessName" req />
-            <F label="Your Name" placeholder="e.g. Rajesh Sharma" field="ownerName" req />
+            <div><label style={labelStyle}>Business Name <span style={{ color: "#dc2626" }}>*</span></label>
+              <input style={inputStyle} placeholder="e.g. Sharma Marble Works" value={form.businessName} onChange={e => setForm(p => ({ ...p, businessName: e.target.value }))} /></div>
+            <div><label style={labelStyle}>Your Name <span style={{ color: "#dc2626" }}>*</span></label>
+              <input style={inputStyle} placeholder="e.g. Rajesh Sharma" value={form.ownerName} onChange={e => setForm(p => ({ ...p, ownerName: e.target.value }))} /></div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <F label="Phone" placeholder="9876543210" field="phone" />
-              <F label="City" placeholder="Mangaluru" field="city" />
+              <div><label style={labelStyle}>Phone</label>
+                <input style={inputStyle} placeholder="9876543210" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} /></div>
+              <div><label style={labelStyle}>City</label>
+                <input style={inputStyle} placeholder="Mangaluru" value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} /></div>
             </div>
           </>}
-          <F label="Email" placeholder="you@email.com" field="email" type="email" req />
-          <F label="Password" placeholder={mode === "signup" ? "Min 6 characters" : "Your password"} field="password" type="password" req />
+          <div><label style={labelStyle}>Email <span style={{ color: "#dc2626" }}>*</span></label>
+            <input style={inputStyle} type="email" placeholder="you@email.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></div>
+          <div><label style={labelStyle}>Password <span style={{ color: "#dc2626" }}>*</span></label>
+            <input style={inputStyle} type="password" placeholder={mode === "signup" ? "Min 6 characters" : "Your password"} value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} /></div>
         </div>
 
         {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 8, padding: "10px 13px", fontSize: 13, marginTop: 14, fontWeight: 600 }}>⚠ {error}</div>}
