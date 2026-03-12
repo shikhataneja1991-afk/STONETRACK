@@ -78,8 +78,21 @@ const AuthScreen = ({ onAuth }) => {
   const handleLogin = async () => {
     if (!form.email || !form.password) { setError("Enter email and password"); return; }
     setLoading(true); setError("");
-    const { error: err } = await sb.auth.signInWithPassword({ email: form.email, password: form.password });
-    if (err) setError(err.message);
+    const { data, error: err } = await sb.auth.signInWithPassword({ email: form.email, password: form.password });
+    if (err) { setError(err.message); setLoading(false); return; }
+    // If logged in but no business yet, create one
+    if (data.user) {
+      const { data: biz } = await sb.from("businesses").select("id").eq("owner_id", data.user.id).single();
+      if (!biz) {
+        await sb.from("businesses").insert({
+          owner_id: data.user.id,
+          business_name: form.businessName || "My Marble Business",
+          owner_name: form.ownerName || "",
+          phone: form.phone || "",
+          city: form.city || ""
+        });
+      }
+    }
     setLoading(false);
   };
 
@@ -87,14 +100,25 @@ const AuthScreen = ({ onAuth }) => {
     if (!form.email || !form.password || !form.businessName || !form.ownerName) { setError("Fill all required fields"); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true); setError("");
+    // Try login first in case user already exists
+    const { data: loginData } = await sb.auth.signInWithPassword({ email: form.email, password: form.password });
+    if (loginData?.user) {
+      const { data: biz } = await sb.from("businesses").select("id").eq("owner_id", loginData.user.id).single();
+      if (!biz) {
+        await sb.from("businesses").insert({
+          owner_id: loginData.user.id, business_name: form.businessName,
+          owner_name: form.ownerName, phone: form.phone, city: form.city
+        });
+      }
+      setLoading(false); return;
+    }
     const { data, error: err } = await sb.auth.signUp({ email: form.email, password: form.password });
     if (err) { setError(err.message); setLoading(false); return; }
     if (data.user) {
-      const { error: bErr } = await sb.from("businesses").insert({
+      await sb.from("businesses").insert({
         owner_id: data.user.id, business_name: form.businessName,
         owner_name: form.ownerName, phone: form.phone, city: form.city
       });
-      if (bErr) setError(bErr.message);
     }
     setLoading(false);
   };
