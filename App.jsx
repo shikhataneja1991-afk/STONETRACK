@@ -1071,13 +1071,45 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
 
         {/* SALES */}
         {tab === "sales" && <div className="fu">
-          <div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f", marginBottom: 16 }}>Sales & Billing</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f" }}>Sales & Billing</div>
+              <div style={{ color: "#64748b", fontSize: 13 }}>{sales.length} invoices total</div>
+            </div>
+            <Btn ch="+ New Sale" onClick={() => { if (slabs.length === 0) { notify("Add slabs to inventory first!", "error"); return; } setSaleTarget(slabs[0]); }} />
+          </div>
+
+          {/* Slab picker for new sale */}
+          {slabs.length > 0 && (
+            <Card style={{ marginBottom: 16, padding: 14, background: "#f0f6ff", border: "1.5px solid #dbeafe" }} ch={<>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#1e3a5f", marginBottom: 10 }}>🛒 Quick Sale — Pick a Slab</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <select onChange={e => { const s = slabs.find(x => x.id === e.target.value); if (s) setSaleTarget(s); }}
+                  style={{ flex: 1, minWidth: 200, border: "1.5px solid #dbeafe", borderRadius: 8, padding: "9px 12px", fontSize: 14, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "#fff" }}>
+                  <option value="">— Select a slab to sell —</option>
+                  {slabs.filter(s => s.qty > 0).map(s => (
+                    <option key={s.id} value={s.id}>{s.name} · {s.qty} sqft · ₹{s.price_per_sqft}/sqft</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Select slab above to open sale form</div>
+              </div>
+            </>} />
+          )}
+
           <div className="g4" style={{ marginBottom: 16 }}>
             <StatCard label="Revenue (ex GST)" value={fmtL(stats.tr)} color="#16a34a" icon="₹" />
             <StatCard label="Revenue (inc GST)" value={fmtL(stats.tr * 1.18)} color="#0369a1" icon="🧾" />
             <StatCard label="Total Profit" value={fmtL(stats.tp)} color="#7c3aed" icon="%" />
             <StatCard label="Margin" value={`${stats.tr > 0 ? ((stats.tp / stats.tr) * 100).toFixed(1) : 0}%`} color="#1e3a5f" icon="📈" />
           </div>
+
+          {sales.length === 0 ? (
+            <Card ch={<div style={{ textAlign: "center", padding: "48px 20px" }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🧾</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: "#1e3a5f", marginBottom: 8 }}>No sales yet</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Pick a slab above and click sell to record your first sale</div>
+            </div>} />
+          ) : (
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <Card style={{ padding: 0, minWidth: 900 }} ch={<table>
               <thead><tr><th>INVOICE</th><th>DATE</th><th>ITEM</th><th>CUSTOMER</th><th>SQFT</th><th>TOTAL</th><th>PAID</th><th>DUE</th><th>PROFIT</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
@@ -1104,6 +1136,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               })}</tbody>
             </table>} />
           </div>
+          )}
         </div>}
 
         {/* PAYMENTS */}
