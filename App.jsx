@@ -988,6 +988,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                     <Btn sm ch="QR" v="g" onClick={() => setPrintTarget(s)} />
                     <Btn sm ch="Edit" v="g" onClick={() => setEditSlabData({ ...s })} />
                     <Btn sm ch="Dmg" v="d" onClick={() => setDamageTarget(s)} />
+                    <Btn sm ch="🗑" v="d" onClick={async () => { if (window.confirm(`Delete "${s.name}"? This cannot be undone.`)) { await sb.from("slabs").delete().eq("id", s.id); setSlabs(p => p.filter(x => x.id !== s.id)); notify("Slab deleted"); } }} />
                   </div></td>
                 </tr>);
               })}</tbody>
@@ -1440,14 +1441,17 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                 { icon: "🔒", title: "Set a Staff PIN", desc: "Give your staff a 4-digit PIN to check stock on their phone — without seeing prices or financials", action: "Set PIN", fn: () => { setShowWelcome(false); setStaffPinOpen(true); } },
                 { icon: "👥", title: "Add a customer account", desc: "Track contractor and builder purchases, payments and outstanding dues all in one place", action: "Add Customer", fn: () => { setShowWelcome(false); setTab("customers"); setAddCustOpen(true); } },
               ].map((step, i) => (
-                <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 20, opacity: welcomeStep === i ? 1 : 0.45, transition: "opacity 0.3s" }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 12, background: welcomeStep === i ? "#1e3a5f" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{welcomeStep > i ? "✅" : step.icon}</div>
+                <div key={i} onClick={() => setWelcomeStep(i)}
+                  style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 16, cursor: "pointer", background: welcomeStep === i ? "#f0f6ff" : "transparent", borderRadius: 12, padding: "12px", border: welcomeStep === i ? "1.5px solid #dbeafe" : "1.5px solid transparent", transition: "all 0.2s" }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 12, background: welcomeStep === i ? "#1e3a5f" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{step.icon}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: "#1e3a5f", marginBottom: 3 }}>{step.title}</div>
                     <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, marginBottom: welcomeStep === i ? 10 : 0 }}>{step.desc}</div>
-                    {welcomeStep === i && <button onClick={step.fn} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{step.action} →</button>}
+                    {welcomeStep === i && <button onClick={e => { e.stopPropagation(); step.fn(); }} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{step.action} →</button>}
                   </div>
-                  <div style={{ width: 24, height: 24, borderRadius: "50%", border: `2px solid ${welcomeStep > i ? "#16a34a" : welcomeStep === i ? "#1e3a5f" : "#e2e8f0"}`, background: welcomeStep > i ? "#16a34a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, color: "#fff", fontWeight: 700 }}>{welcomeStep > i ? "✓" : i + 1}</div>
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", border: `2px solid ${welcomeStep === i ? "#1e3a5f" : "#e2e8f0"}`, background: welcomeStep === i ? "#1e3a5f" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13, color: "#fff", fontWeight: 800, transition: "all 0.2s" }}>
+                    {welcomeStep === i ? "→" : ""}
+                  </div>
                 </div>
               ))}
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
