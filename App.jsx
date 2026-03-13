@@ -641,7 +641,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
   const [damageTarget, setDamageTarget] = useState(null);
 
   // forms
-  const [ns, setNs] = useState({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", sqft: "", qty: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
+  const [ns, setNs] = useState({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", sqft: "", slabs: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
   const [sf, setSf] = useState({ sqftSold: "", customer: "", phone: "", wastage: "5", gstNo: "", paymentMode: "Cash", paidAmount: "" });
   const [rf, setRf] = useState({ customer: "", phone: "", days: "7" });
   const [nc, setNc] = useState({ name: "", phone: "", email: "", type: "Contractor", gstNo: "", creditLimit: "", notes: "" });
@@ -669,36 +669,39 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
 
   // ── ADD SLAB ──
   const addSlab = async () => {
-    if (!ns.name || !ns.qty || !ns.pricePerSqft) { notify("Fill required fields", "error"); return; }
-    const qty = +ns.qty; const threshold = +ns.threshold;
+    if (!ns.name || !ns.slabs || !ns.sqft || !ns.pricePerSqft) { notify("Fill required fields", "error"); return; }
+    const slabCount = +ns.slabs;
+    const sqftPerSlab = +ns.sqft;
+    const totalQty = slabCount * sqftPerSlab;
+    const threshold = +ns.threshold;
     const barcode = `ST-${String(slabs.length + 1).padStart(3, "0")}`;
     const { data, error } = await sb.from("slabs").insert({
       business_id: business.id, name: ns.name, type: ns.type, variety: ns.variety, finish: ns.finish,
-      length: +ns.length, width: +ns.width, sqft: qty, qty, price_per_sqft: +ns.pricePerSqft,
+      length: +ns.length, width: +ns.width, sqft: sqftPerSlab, qty: totalQty, price_per_sqft: +ns.pricePerSqft,
       cost_per_sqft: +ns.costPerSqft || 0, block: ns.block, row_no: +ns.row, slot_no: +ns.slot,
-      threshold, supplier: ns.supplier, barcode, status: getStatus(qty, threshold)
+      threshold, supplier: ns.supplier, barcode, status: getStatus(totalQty, threshold)
     }).select().single();
     if (error) { notify(error.message, "error"); return; }
     setSlabs(p => [...p, data]);
     setAddSlabOpen(false);
-    setNs({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", qty: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
-    notify(`${data.name} added! Barcode: ${barcode}`);
+    setNs({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", sqft: "", slabs: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
+    notify(`${data.name} added! ${slabCount} slabs × ${sqftPerSlab} sqft = ${totalQty} sqft total`);
   };
 
   // ── RECORD SALE ──
   const doSale = async () => {
     if (!sf.sqftSold || +sf.sqftSold <= 0) { notify("Enter valid sq.ft", "error"); return; }
     const slab = slabs.find(s => s.id === saleTarget.id);
-    const su = Math.ceil(+sf.sqftSold / slab.sqft);
-    if (su > slab.qty) { notify("Not enough stock!", "error"); return; }
-    const nq = slab.qty - su;
+    const sqftSold = +sf.sqftSold;
+    if (sqftSold > slab.qty) { notify("Not enough sq.ft in stock!", "error"); return; }
+    const nq = slab.qty - sqftSold;
     const newStatus = getStatus(nq, slab.threshold);
     const inv = `INV-${String(sales.length + 1).padStart(3, "0")}`;
     const [{ error: slabErr }, { data: newSale, error: saleErr }] = await Promise.all([
       sb.from("slabs").update({ qty: nq, status: newStatus }).eq("id", slab.id),
       sb.from("sales").insert({
         business_id: business.id, slab_id: slab.id, slab_name: slab.name, date: today,
-        sqft_sold: +sf.sqftSold, slabs_used: su, price_per_sqft: slab.price_per_sqft,
+        sqft_sold: sqftSold, slabs_used: 1, price_per_sqft: slab.price_per_sqft,
         cost_per_sqft: slab.cost_per_sqft, wastage: +sf.wastage || 0,
         customer: sf.customer || "Walk-in", phone: sf.phone, gst_no: sf.gstNo,
         invoice_no: inv, delivery_status: "Pending", paid_amount: +sf.paidAmount || 0, payment_mode: sf.paymentMode
@@ -779,12 +782,13 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
 
   // ── STATS ──
   const stats = useMemo(() => {
-    const tv = slabs.reduce((s, i) => s + i.qty * i.sqft * i.price_per_sqft, 0);
-    const tc = slabs.reduce((s, i) => s + i.qty * i.sqft * i.cost_per_sqft, 0);
+    const tv = slabs.reduce((s, i) => s + i.qty * i.price_per_sqft, 0);
+    const tc = slabs.reduce((s, i) => s + i.qty * i.cost_per_sqft, 0);
     const tr = sales.reduce((s, i) => s + i.sqft_sold * i.price_per_sqft, 0);
     const tp = sales.reduce((s, i) => s + i.sqft_sold * (i.price_per_sqft - i.cost_per_sqft), 0);
     const totalDue = sales.reduce((s, i) => { const t = i.sqft_sold * i.price_per_sqft * 1.18; return s + Math.max(0, t - (i.paid_amount || 0)); }, 0);
-    return { totalSlabs: slabs.reduce((s, i) => s + i.qty, 0), varieties: slabs.length, tv, tc, tr, tp, low: slabs.filter(i => i.status === "Low Stock").length, out: slabs.filter(i => i.status === "Out of Stock").length, totalDue };
+    const totalSqft = slabs.reduce((s, i) => s + i.qty, 0);
+    return { totalSlabs: totalSqft, varieties: slabs.length, tv, tc, tr, tp, low: slabs.filter(i => i.status === "Low Stock").length, out: slabs.filter(i => i.status === "Out of Stock").length, totalDue };
   }, [slabs, sales]);
 
   const filtered = useMemo(() => slabs.filter(s =>
@@ -915,8 +919,8 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
             </div>
           )}
           <div className="g5" style={{ marginBottom: 16 }}>
-            <StatCard label="Total Slabs" value={stats.totalSlabs} sub={`${stats.varieties} varieties`} color="#1e3a5f" icon="⬜" />
-            <StatCard label="Inventory Value" value={fmtL(stats.tv)} sub="At selling price" color="#2563a8" icon="◈" />
+            <StatCard label="Total Sq.Ft" value={stats.totalSlabs} sub={`${stats.varieties} varieties`} color="#1e3a5f" icon="⬜" />
+            <StatCard label="Inventory Value" value={fmtL(stats.tv)} sub="Sq.Ft × Selling price" color="#2563a8" icon="◈" />
             <StatCard label="Total Revenue" value={fmtL(stats.tr)} sub={`${sales.length} invoices`} color="#16a34a" icon="₹" />
             <StatCard label="Total Profit" value={fmtL(stats.tp)} sub={`${stats.tr > 0 ? ((stats.tp / stats.tr) * 100).toFixed(1) : 0}% margin`} color="#7c3aed" icon="%" />
             <StatCard label="Dues Pending" value={fmtINR(Math.round(stats.totalDue))} sub="Incl. GST" color={stats.totalDue > 0 ? "#dc2626" : "#16a34a"} icon="💳" />
@@ -974,15 +978,17 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               </div>} />
             ) : (
             <Card style={{ padding: 0, minWidth: 900 }} ch={<table>
-              <thead><tr><th>BARCODE</th><th>NAME</th><th>TYPE</th><th>SIZE (ft)</th><th>SQ.FT</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>RESERVED</th><th>ACTIONS</th></tr></thead>
+              <thead><tr><th>BARCODE</th><th>NAME</th><th>TYPE</th><th>SIZE (ft)</th><th>SLABS</th><th>SQ.FT</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>RESERVED</th><th>ACTIONS</th></tr></thead>
               <tbody>{filtered.map(s => {
                 const margin = s.price_per_sqft > 0 ? (((s.price_per_sqft - s.cost_per_sqft) / s.price_per_sqft) * 100).toFixed(0) : 0;
+                const slabCount = s.sqft > 0 ? Math.floor(s.qty / s.sqft) : "—";
                 return (<tr key={s.id}>
                   <td><span style={{ fontFamily: "monospace", fontSize: 11, background: "#f0f6ff", color: "#1e3a5f", padding: "2px 7px", borderRadius: 4, fontWeight: 700 }}>{s.barcode}</span></td>
                   <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{s.name}</td>
                   <td><span style={{ background: s.type === "Marble" ? "#dbeafe" : s.type === "Granite" ? "#fce7f3" : "#f0fdf4", color: s.type === "Marble" ? "#1d4ed8" : s.type === "Granite" ? "#9d174d" : "#166534", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{s.type}</span></td>
                   <td style={{ fontSize: 12, color: "#64748b", fontFamily: "monospace" }}>{s.length && s.width ? `${s.length}×${s.width}` : "—"}</td>
-                  <td style={{ fontWeight: 800, fontSize: 16, color: s.qty === 0 ? "#dc2626" : "#1e3a5f" }}>{s.qty} <span style={{ fontSize: 10, fontWeight: 400, color: "#94a3b8" }}>sqft</span></td>
+                  <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{slabCount}</td>
+                  <td style={{ fontWeight: 800, fontSize: 15, color: s.qty === 0 ? "#dc2626" : "#2563eb" }}>{s.qty} <span style={{ fontSize: 10, fontWeight: 400, color: "#94a3b8" }}>sqft</span></td>
                   <td style={{ color: "#64748b" }}>{s.block}</td>
                   <td style={{ color: "#16a34a", fontWeight: 600 }}>{fmtINR(s.price_per_sqft)}</td>
                   <td style={{ color: "#dc2626", fontSize: 12 }}>{fmtINR(s.cost_per_sqft)}</td>
@@ -1258,9 +1264,18 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
           <div className="g2"><Inp label="Slab Name *" placeholder="e.g. Carrara White" value={ns.name} onChange={e => setNs(p => ({ ...p, name: e.target.value }))} /><Sel label="Type" options={STONE_TYPES} value={ns.type} onChange={e => setNs(p => ({ ...p, type: e.target.value }))} /></div>
           <div className="g2"><Sel label="Variety" options={VARIETIES} value={ns.variety} onChange={e => setNs(p => ({ ...p, variety: e.target.value }))} /><Sel label="Finish" options={FINISHES} value={ns.finish} onChange={e => setNs(p => ({ ...p, finish: e.target.value }))} /></div>
           <div className="g2"><Inp label="Length (ft)" type="number" placeholder="e.g. 8" value={ns.length} onChange={e => setNs(p => ({ ...p, length: e.target.value }))} /><Inp label="Width (ft)" type="number" placeholder="e.g. 4" value={ns.width} onChange={e => setNs(p => ({ ...p, width: e.target.value }))} /></div>
-          <div className="g3"><Inp label="Sq.Ft Quantity *" type="number" placeholder="e.g. 500" value={ns.qty} onChange={e => setNs(p => ({ ...p, qty: e.target.value }))} /><Inp label="Selling ₹/Sqft *" type="number" placeholder="e.g. 280" value={ns.pricePerSqft} onChange={e => setNs(p => ({ ...p, pricePerSqft: e.target.value }))} /><Inp label="Cost ₹/Sqft" type="number" placeholder="e.g. 180" value={ns.costPerSqft} onChange={e => setNs(p => ({ ...p, costPerSqft: e.target.value }))} /></div>
+          <div className="g2">
+            <Inp label="No. of Slabs *" type="number" placeholder="e.g. 10" value={ns.slabs} onChange={e => setNs(p => ({ ...p, slabs: e.target.value }))} />
+            <Inp label="Sq.Ft per Slab *" type="number" placeholder="e.g. 32" value={ns.sqft} onChange={e => setNs(p => ({ ...p, sqft: e.target.value }))} />
+          </div>
+          {ns.slabs && ns.sqft && +ns.slabs > 0 && +ns.sqft > 0 && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#16a34a", fontWeight: 700 }}>
+              📦 Total Stock = {+ns.slabs} slabs × {+ns.sqft} sqft = <span style={{ fontSize: 16 }}>{+ns.slabs * +ns.sqft} sqft</span>
+            </div>
+          )}
+          <div className="g3"><Inp label="Selling ₹/Sqft *" type="number" placeholder="e.g. 280" value={ns.pricePerSqft} onChange={e => setNs(p => ({ ...p, pricePerSqft: e.target.value }))} /><Inp label="Cost ₹/Sqft" type="number" placeholder="e.g. 180" value={ns.costPerSqft} onChange={e => setNs(p => ({ ...p, costPerSqft: e.target.value }))} /><Inp label="Low Stock Alert (sqft)" type="number" value={ns.threshold} onChange={e => setNs(p => ({ ...p, threshold: e.target.value }))} /></div>
           <div className="g3"><Sel label="Block" options={BLOCKS} value={ns.block} onChange={e => setNs(p => ({ ...p, block: e.target.value }))} /><Inp label="Row" type="number" value={ns.row} onChange={e => setNs(p => ({ ...p, row: e.target.value }))} /><Inp label="Slot" type="number" value={ns.slot} onChange={e => setNs(p => ({ ...p, slot: e.target.value }))} /></div>
-          <div className="g2"><Inp label="Low Stock Alert Below (Sq.Ft)" type="number" value={ns.threshold} onChange={e => setNs(p => ({ ...p, threshold: e.target.value }))} /><Inp label="Supplier" value={ns.supplier} onChange={e => setNs(p => ({ ...p, supplier: e.target.value }))} /></div>
+          <Inp label="Supplier" value={ns.supplier} onChange={e => setNs(p => ({ ...p, supplier: e.target.value }))} />
         </div>
         <HR />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn ch="Cancel" v="g" onClick={() => setAddSlabOpen(false)} /><Btn ch="Add to Inventory" onClick={addSlab} /></div>
@@ -1279,24 +1294,24 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn ch="Cancel" v="g" onClick={() => setEditSlabData(null)} /><Btn ch="Save Changes" onClick={saveEditSlab} /></div>
       </>} />}
 
-      {saleTarget && <Mdl title="Record Sale" sub={`${saleTarget.name} · ₹${saleTarget.price_per_sqft}/sqft · ${saleTarget.qty} slabs`} onClose={() => setSaleTarget(null)} wide ch={<>
+      {saleTarget && <Mdl title="Record Sale" sub={`${saleTarget.name} · ₹${saleTarget.price_per_sqft}/sqft · ${saleTarget.qty} sqft available`} onClose={() => setSaleTarget(null)} wide ch={<>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="g2"><Inp label="Customer Name" placeholder="Name or company" value={sf.customer} onChange={e => setSf(p => ({ ...p, customer: e.target.value }))} /><Inp label="Phone" value={sf.phone} onChange={e => setSf(p => ({ ...p, phone: e.target.value }))} /></div>
           <div className="g2"><Inp label="Customer GST No." value={sf.gstNo} onChange={e => setSf(p => ({ ...p, gstNo: e.target.value }))} /><Sel label="Payment Mode" options={["Cash", "Bank Transfer", "Cheque", "UPI", "Credit"]} value={sf.paymentMode} onChange={e => setSf(p => ({ ...p, paymentMode: e.target.value }))} /></div>
           <div className="g3"><Inp label="Sq.Ft Required *" type="number" value={sf.sqftSold} onChange={e => setSf(p => ({ ...p, sqftSold: e.target.value }))} /><Inp label="Wastage %" type="number" value={sf.wastage} onChange={e => setSf(p => ({ ...p, wastage: e.target.value }))} /><Inp label="Amount Paid Now ₹" type="number" value={sf.paidAmount} onChange={e => setSf(p => ({ ...p, paidAmount: e.target.value }))} /></div>
         </div>
         {sf.sqftSold && +sf.sqftSold > 0 && (() => {
-          const su = Math.ceil(+sf.sqftSold / saleTarget.sqft);
-          const amt = +sf.sqftSold * saleTarget.price_per_sqft;
+          const sqftSold = +sf.sqftSold;
+          const amt = sqftSold * saleTarget.price_per_sqft;
           const gst = amt * 0.18; const total = amt + gst;
-          const pft = +sf.sqftSold * (saleTarget.price_per_sqft - saleTarget.cost_per_sqft);
+          const pft = sqftSold * (saleTarget.price_per_sqft - saleTarget.cost_per_sqft);
           return (<div style={{ background: "#f8faff", border: "1px solid #e2e8f0", borderRadius: 8, padding: 14, marginTop: 12 }}>
-            {[["Slabs Needed", su, "#1e3a5f"], ["Amount (ex GST)", fmtINR(Math.round(amt)), "#1e3a5f"], ["GST 18%", fmtINR(Math.round(gst)), "#64748b"], ["Total", fmtINR(Math.round(total)), "#1e3a5f"], ["Your Profit", fmtINR(pft), "#7c3aed"], ["Margin", `${((pft / amt) * 100).toFixed(1)}%`, "#d97706"]].map(([l, v, c]) => (
+            {[["Amount (ex GST)", fmtINR(Math.round(amt)), "#1e3a5f"], ["GST 18%", fmtINR(Math.round(gst)), "#64748b"], ["Total", fmtINR(Math.round(total)), "#16a34a"], ["Your Profit", fmtINR(Math.round(pft)), "#7c3aed"], ["Margin", `${((pft / amt) * 100).toFixed(1)}%`, "#d97706"]].map(([l, v, c]) => (
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #e2e8f0" }}>
                 <span style={{ color: "#64748b", fontSize: 13 }}>{l}</span><span style={{ fontWeight: 700, color: c }}>{v}</span>
               </div>
             ))}
-            {su > saleTarget.qty && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 8, fontWeight: 600 }}>⚠ Only {saleTarget.qty} slabs available!</div>}
+            {sqftSold > saleTarget.qty && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 8, fontWeight: 600 }}>⚠ Only {saleTarget.qty} sq.ft available!</div>}
           </div>);
         })()}
         <HR />
@@ -1315,7 +1330,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
       {detailTarget && <Mdl title="Slab Details" sub={detailTarget.barcode} onClose={() => setDetailTarget(null)} wide ch={<>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
-            {[["Name", detailTarget.name], ["Type", detailTarget.type], ["Variety", detailTarget.variety], ["Finish", detailTarget.finish], ["Sq.Ft/Slab", detailTarget.sqft], ["In Stock", detailTarget.qty], ["Location", `Block ${detailTarget.block} · R${detailTarget.row_no} · S${detailTarget.slot_no}`], ["Selling Price", fmtINR(detailTarget.price_per_sqft) + "/sqft"], ["Cost Price", fmtINR(detailTarget.cost_per_sqft) + "/sqft"], ["Profit/Sqft", fmtINR(detailTarget.price_per_sqft - detailTarget.cost_per_sqft)], ["Supplier", detailTarget.supplier || "—"], ["Reserved", detailTarget.reserved_for || "None"]].map(([l, v]) => (
+            {[["Name", detailTarget.name], ["Type", detailTarget.type], ["Variety", detailTarget.variety], ["Finish", detailTarget.finish], ["Size", detailTarget.length && detailTarget.width ? `${detailTarget.length} × ${detailTarget.width} ft` : "—"], ["Sq.Ft in Stock", `${detailTarget.qty} sqft`], ["Location", `Block ${detailTarget.block} · R${detailTarget.row_no} · S${detailTarget.slot_no}`], ["Selling Price", fmtINR(detailTarget.price_per_sqft) + "/sqft"], ["Cost Price", fmtINR(detailTarget.cost_per_sqft) + "/sqft"], ["Profit/Sqft", fmtINR(detailTarget.price_per_sqft - detailTarget.cost_per_sqft)], ["Supplier", detailTarget.supplier || "—"], ["Reserved", detailTarget.reserved_for || "None"]].map(([l, v]) => (
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f8faff" }}>
                 <span style={{ color: "#64748b", fontSize: 13 }}>{l}</span>
                 <span style={{ fontWeight: 600, fontSize: 13, color: "#1e3a5f" }}>{v}</span>
