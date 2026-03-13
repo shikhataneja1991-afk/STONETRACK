@@ -788,7 +788,8 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     const tp = sales.reduce((s, i) => s + i.sqft_sold * (i.price_per_sqft - i.cost_per_sqft), 0);
     const totalDue = sales.reduce((s, i) => { const t = i.sqft_sold * i.price_per_sqft * 1.18; return s + Math.max(0, t - (i.paid_amount || 0)); }, 0);
     const totalSqft = slabs.reduce((s, i) => s + i.qty, 0);
-    return { totalSlabs: totalSqft, varieties: slabs.length, tv, tc, tr, tp, low: slabs.filter(i => i.status === "Low Stock").length, out: slabs.filter(i => i.status === "Out of Stock").length, totalDue };
+    const totalSlabCount = slabs.reduce((s, i) => s + (i.sqft > 0 ? Math.floor(i.qty / i.sqft) : 0), 0);
+    return { totalSlabs: totalSqft, totalSlabCount, varieties: slabs.length, tv, tc, tr, tp, low: slabs.filter(i => i.status === "Low Stock").length, out: slabs.filter(i => i.status === "Out of Stock").length, totalDue };
   }, [slabs, sales]);
 
   const filtered = useMemo(() => slabs.filter(s =>
@@ -918,8 +919,9 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               </div>
             </div>
           )}
-          <div className="g5" style={{ marginBottom: 16 }}>
-            <StatCard label="Total Sq.Ft" value={stats.totalSlabs} sub={`${stats.varieties} varieties`} color="#1e3a5f" icon="⬜" />
+          <div className="g3" style={{ marginBottom: 16, gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))" }}>
+            <StatCard label="Total Slabs" value={stats.totalSlabCount} sub={`${stats.varieties} varieties`} color="#1e3a5f" icon="🪨" />
+            <StatCard label="Total Sq.Ft" value={stats.totalSlabs} sub="In stock" color="#0369a1" icon="⬜" />
             <StatCard label="Inventory Value" value={fmtL(stats.tv)} sub="Sq.Ft × Selling price" color="#2563a8" icon="◈" />
             <StatCard label="Total Revenue" value={fmtL(stats.tr)} sub={`${sales.length} invoices`} color="#16a34a" icon="₹" />
             <StatCard label="Total Profit" value={fmtL(stats.tp)} sub={`${stats.tr > 0 ? ((stats.tp / stats.tr) * 100).toFixed(1) : 0}% margin`} color="#7c3aed" icon="%" />
