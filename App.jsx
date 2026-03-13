@@ -669,19 +669,19 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
 
   // ── ADD SLAB ──
   const addSlab = async () => {
-    if (!ns.name || !ns.sqft || !ns.qty || !ns.pricePerSqft) { notify("Fill required fields", "error"); return; }
+    if (!ns.name || !ns.qty || !ns.pricePerSqft) { notify("Fill required fields", "error"); return; }
     const qty = +ns.qty; const threshold = +ns.threshold;
     const barcode = `ST-${String(slabs.length + 1).padStart(3, "0")}`;
     const { data, error } = await sb.from("slabs").insert({
       business_id: business.id, name: ns.name, type: ns.type, variety: ns.variety, finish: ns.finish,
-      length: +ns.length, width: +ns.width, sqft: +ns.sqft, qty, price_per_sqft: +ns.pricePerSqft,
+      length: +ns.length, width: +ns.width, sqft: qty, qty, price_per_sqft: +ns.pricePerSqft,
       cost_per_sqft: +ns.costPerSqft || 0, block: ns.block, row_no: +ns.row, slot_no: +ns.slot,
       threshold, supplier: ns.supplier, barcode, status: getStatus(qty, threshold)
     }).select().single();
     if (error) { notify(error.message, "error"); return; }
     setSlabs(p => [...p, data]);
     setAddSlabOpen(false);
-    setNs({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", sqft: "", qty: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
+    setNs({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", qty: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
     notify(`${data.name} added! Barcode: ${barcode}`);
   };
 
@@ -744,7 +744,14 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
   // ── SAVE EDIT SLAB ──
   const saveEditSlab = async () => {
     const status = getStatus(editSlabData.qty, editSlabData.threshold);
-    const { error } = await sb.from("slabs").update({ name: editSlabData.name, qty: editSlabData.qty, price_per_sqft: editSlabData.price_per_sqft, cost_per_sqft: editSlabData.cost_per_sqft, block: editSlabData.block, threshold: editSlabData.threshold, supplier: editSlabData.supplier, status }).eq("id", editSlabData.id);
+    const { error } = await sb.from("slabs").update({
+      name: editSlabData.name, type: editSlabData.type, variety: editSlabData.variety,
+      finish: editSlabData.finish, length: editSlabData.length, width: editSlabData.width,
+      qty: editSlabData.qty, price_per_sqft: editSlabData.price_per_sqft,
+      cost_per_sqft: editSlabData.cost_per_sqft, block: editSlabData.block,
+      row_no: editSlabData.row_no, slot_no: editSlabData.slot_no,
+      threshold: editSlabData.threshold, supplier: editSlabData.supplier, status
+    }).eq("id", editSlabData.id);
     if (error) { notify(error.message, "error"); return; }
     setSlabs(p => p.map(s => s.id === editSlabData.id ? { ...editSlabData, status } : s));
     setEditSlabData(null); notify("Updated!");
@@ -967,15 +974,15 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               </div>} />
             ) : (
             <Card style={{ padding: 0, minWidth: 900 }} ch={<table>
-              <thead><tr><th>BARCODE</th><th>NAME</th><th>TYPE</th><th>SQFT</th><th>STOCK</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>RESERVED</th><th>ACTIONS</th></tr></thead>
+              <thead><tr><th>BARCODE</th><th>NAME</th><th>TYPE</th><th>SIZE (ft)</th><th>SQ.FT</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>RESERVED</th><th>ACTIONS</th></tr></thead>
               <tbody>{filtered.map(s => {
                 const margin = s.price_per_sqft > 0 ? (((s.price_per_sqft - s.cost_per_sqft) / s.price_per_sqft) * 100).toFixed(0) : 0;
                 return (<tr key={s.id}>
                   <td><span style={{ fontFamily: "monospace", fontSize: 11, background: "#f0f6ff", color: "#1e3a5f", padding: "2px 7px", borderRadius: 4, fontWeight: 700 }}>{s.barcode}</span></td>
                   <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{s.name}</td>
                   <td><span style={{ background: s.type === "Marble" ? "#dbeafe" : s.type === "Granite" ? "#fce7f3" : "#f0fdf4", color: s.type === "Marble" ? "#1d4ed8" : s.type === "Granite" ? "#9d174d" : "#166534", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{s.type}</span></td>
-                  <td style={{ color: "#2563eb", fontWeight: 700 }}>{s.sqft}</td>
-                  <td style={{ fontWeight: 800, fontSize: 16, color: s.qty === 0 ? "#dc2626" : "#1e3a5f" }}>{s.qty}</td>
+                  <td style={{ fontSize: 12, color: "#64748b", fontFamily: "monospace" }}>{s.length && s.width ? `${s.length}×${s.width}` : "—"}</td>
+                  <td style={{ fontWeight: 800, fontSize: 16, color: s.qty === 0 ? "#dc2626" : "#1e3a5f" }}>{s.qty} <span style={{ fontSize: 10, fontWeight: 400, color: "#94a3b8" }}>sqft</span></td>
                   <td style={{ color: "#64748b" }}>{s.block}</td>
                   <td style={{ color: "#16a34a", fontWeight: 600 }}>{fmtINR(s.price_per_sqft)}</td>
                   <td style={{ color: "#dc2626", fontSize: 12 }}>{fmtINR(s.cost_per_sqft)}</td>
@@ -1250,21 +1257,23 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="g2"><Inp label="Slab Name *" placeholder="e.g. Carrara White" value={ns.name} onChange={e => setNs(p => ({ ...p, name: e.target.value }))} /><Sel label="Type" options={STONE_TYPES} value={ns.type} onChange={e => setNs(p => ({ ...p, type: e.target.value }))} /></div>
           <div className="g2"><Sel label="Variety" options={VARIETIES} value={ns.variety} onChange={e => setNs(p => ({ ...p, variety: e.target.value }))} /><Sel label="Finish" options={FINISHES} value={ns.finish} onChange={e => setNs(p => ({ ...p, finish: e.target.value }))} /></div>
-          <div className="g3"><Inp label="Length (cm)" type="number" value={ns.length} onChange={e => setNs(p => ({ ...p, length: e.target.value }))} /><Inp label="Width (cm)" type="number" value={ns.width} onChange={e => setNs(p => ({ ...p, width: e.target.value }))} /><Inp label="Sq.Ft/Slab *" type="number" value={ns.sqft} onChange={e => setNs(p => ({ ...p, sqft: e.target.value }))} /></div>
-          <div className="g3"><Inp label="Quantity *" type="number" value={ns.qty} onChange={e => setNs(p => ({ ...p, qty: e.target.value }))} /><Inp label="Selling ₹/Sqft *" type="number" value={ns.pricePerSqft} onChange={e => setNs(p => ({ ...p, pricePerSqft: e.target.value }))} /><Inp label="Cost ₹/Sqft" type="number" value={ns.costPerSqft} onChange={e => setNs(p => ({ ...p, costPerSqft: e.target.value }))} /></div>
+          <div className="g2"><Inp label="Length (ft)" type="number" placeholder="e.g. 8" value={ns.length} onChange={e => setNs(p => ({ ...p, length: e.target.value }))} /><Inp label="Width (ft)" type="number" placeholder="e.g. 4" value={ns.width} onChange={e => setNs(p => ({ ...p, width: e.target.value }))} /></div>
+          <div className="g3"><Inp label="Sq.Ft Quantity *" type="number" placeholder="e.g. 500" value={ns.qty} onChange={e => setNs(p => ({ ...p, qty: e.target.value }))} /><Inp label="Selling ₹/Sqft *" type="number" placeholder="e.g. 280" value={ns.pricePerSqft} onChange={e => setNs(p => ({ ...p, pricePerSqft: e.target.value }))} /><Inp label="Cost ₹/Sqft" type="number" placeholder="e.g. 180" value={ns.costPerSqft} onChange={e => setNs(p => ({ ...p, costPerSqft: e.target.value }))} /></div>
           <div className="g3"><Sel label="Block" options={BLOCKS} value={ns.block} onChange={e => setNs(p => ({ ...p, block: e.target.value }))} /><Inp label="Row" type="number" value={ns.row} onChange={e => setNs(p => ({ ...p, row: e.target.value }))} /><Inp label="Slot" type="number" value={ns.slot} onChange={e => setNs(p => ({ ...p, slot: e.target.value }))} /></div>
-          <div className="g2"><Inp label="Low Stock Alert Below" type="number" value={ns.threshold} onChange={e => setNs(p => ({ ...p, threshold: e.target.value }))} /><Inp label="Supplier" value={ns.supplier} onChange={e => setNs(p => ({ ...p, supplier: e.target.value }))} /></div>
+          <div className="g2"><Inp label="Low Stock Alert Below (Sq.Ft)" type="number" value={ns.threshold} onChange={e => setNs(p => ({ ...p, threshold: e.target.value }))} /><Inp label="Supplier" value={ns.supplier} onChange={e => setNs(p => ({ ...p, supplier: e.target.value }))} /></div>
         </div>
         <HR />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn ch="Cancel" v="g" onClick={() => setAddSlabOpen(false)} /><Btn ch="Add to Inventory" onClick={addSlab} /></div>
       </>} />}
 
-      {editSlabData && <Mdl title="Edit Slab" sub={editSlabData.name} onClose={() => setEditSlabData(null)} ch={<>
+      {editSlabData && <Mdl title="Edit Slab" sub={editSlabData.name} onClose={() => setEditSlabData(null)} wide ch={<>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="g2"><Inp label="Name" value={editSlabData.name} onChange={e => setEditSlabData(p => ({ ...p, name: e.target.value }))} /><Inp label="Quantity" type="number" value={editSlabData.qty} onChange={e => setEditSlabData(p => ({ ...p, qty: +e.target.value }))} /></div>
-          <div className="g2"><Inp label="Selling ₹/Sqft" type="number" value={editSlabData.price_per_sqft} onChange={e => setEditSlabData(p => ({ ...p, price_per_sqft: +e.target.value }))} /><Inp label="Cost ₹/Sqft" type="number" value={editSlabData.cost_per_sqft} onChange={e => setEditSlabData(p => ({ ...p, cost_per_sqft: +e.target.value }))} /></div>
-          <div className="g2"><Sel label="Block" options={BLOCKS} value={editSlabData.block} onChange={e => setEditSlabData(p => ({ ...p, block: e.target.value }))} /><Inp label="Threshold" type="number" value={editSlabData.threshold} onChange={e => setEditSlabData(p => ({ ...p, threshold: +e.target.value }))} /></div>
-          <Inp label="Supplier" value={editSlabData.supplier || ""} onChange={e => setEditSlabData(p => ({ ...p, supplier: e.target.value }))} />
+          <div className="g2"><Inp label="Slab Name" value={editSlabData.name} onChange={e => setEditSlabData(p => ({ ...p, name: e.target.value }))} /><Sel label="Type" options={STONE_TYPES} value={editSlabData.type} onChange={e => setEditSlabData(p => ({ ...p, type: e.target.value }))} /></div>
+          <div className="g2"><Sel label="Variety" options={VARIETIES} value={editSlabData.variety} onChange={e => setEditSlabData(p => ({ ...p, variety: e.target.value }))} /><Sel label="Finish" options={FINISHES} value={editSlabData.finish} onChange={e => setEditSlabData(p => ({ ...p, finish: e.target.value }))} /></div>
+          <div className="g2"><Inp label="Length (ft)" type="number" value={editSlabData.length} onChange={e => setEditSlabData(p => ({ ...p, length: +e.target.value }))} /><Inp label="Width (ft)" type="number" value={editSlabData.width} onChange={e => setEditSlabData(p => ({ ...p, width: +e.target.value }))} /></div>
+          <div className="g3"><Inp label="Sq.Ft Quantity" type="number" value={editSlabData.qty} onChange={e => setEditSlabData(p => ({ ...p, qty: +e.target.value }))} /><Inp label="Selling ₹/Sqft" type="number" value={editSlabData.price_per_sqft} onChange={e => setEditSlabData(p => ({ ...p, price_per_sqft: +e.target.value }))} /><Inp label="Cost ₹/Sqft" type="number" value={editSlabData.cost_per_sqft} onChange={e => setEditSlabData(p => ({ ...p, cost_per_sqft: +e.target.value }))} /></div>
+          <div className="g3"><Sel label="Block" options={BLOCKS} value={editSlabData.block} onChange={e => setEditSlabData(p => ({ ...p, block: e.target.value }))} /><Inp label="Row" type="number" value={editSlabData.row_no} onChange={e => setEditSlabData(p => ({ ...p, row_no: +e.target.value }))} /><Inp label="Slot" type="number" value={editSlabData.slot_no} onChange={e => setEditSlabData(p => ({ ...p, slot_no: +e.target.value }))} /></div>
+          <div className="g2"><Inp label="Low Stock Alert Below (Sq.Ft)" type="number" value={editSlabData.threshold} onChange={e => setEditSlabData(p => ({ ...p, threshold: +e.target.value }))} /><Inp label="Supplier" value={editSlabData.supplier || ""} onChange={e => setEditSlabData(p => ({ ...p, supplier: e.target.value }))} /></div>
         </div>
         <HR />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}><Btn ch="Cancel" v="g" onClick={() => setEditSlabData(null)} /><Btn ch="Save Changes" onClick={saveEditSlab} /></div>
