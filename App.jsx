@@ -624,6 +624,8 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
   const [notif, setNotif] = useState(null);
   const [staffPinOpen, setStaffPinOpen] = useState(false);
   const [newStaffPin, setNewStaffPin] = useState("");
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeStep, setWelcomeStep] = useState(0);
 
   // modals
   const [addSlabOpen, setAddSlabOpen] = useState(false);
@@ -659,6 +661,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     setSlabs(sl || []);
     setSales(sa || []);
     setCustomers(cu || []);
+    if ((sl || []).length === 0) setShowWelcome(true);
     setLoading(false);
   }, [business.id]);
 
@@ -891,6 +894,19 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
         {tab === "dashboard" && <div className="fu">
           <div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f", marginBottom: 2 }}>Business Overview</div>
           <div style={{ color: "#64748b", fontSize: 13, marginBottom: 18 }}>{today} · {business.business_name}</div>
+
+          {/* Empty state banner for new users */}
+          {slabs.length === 0 && (
+            <div style={{ background: "linear-gradient(135deg, #eff6ff, #f0fdf4)", border: "1.5px dashed #93c5fd", borderRadius: 14, padding: "24px 20px", marginBottom: 20, textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>👋</div>
+              <div style={{ fontWeight: 800, fontSize: 18, color: "#1e3a5f", marginBottom: 6 }}>Your inventory is empty!</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16, lineHeight: 1.6 }}>Add your first slab to start tracking stock, generating QR codes, and recording sales.</div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={() => setAddSlabOpen(true)} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📦 Add First Slab</button>
+                <button onClick={() => setShowWelcome(true)} style={{ background: "#fff", color: "#1e3a5f", border: "1.5px solid #dbeafe", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>📋 Setup Guide</button>
+              </div>
+            </div>
+          )}
           <div className="g5" style={{ marginBottom: 16 }}>
             <StatCard label="Total Slabs" value={stats.totalSlabs} sub={`${stats.varieties} varieties`} color="#1e3a5f" icon="⬜" />
             <StatCard label="Inventory Value" value={fmtL(stats.tv)} sub="At selling price" color="#2563a8" icon="◈" />
@@ -942,6 +958,14 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
             ))}
           </div>} />
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            {slabs.length === 0 ? (
+              <Card ch={<div style={{ textAlign: "center", padding: "48px 20px" }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: "#1e3a5f", marginBottom: 8 }}>No slabs yet</div>
+                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Add your marble and granite inventory to get started</div>
+                <button onClick={() => setAddSlabOpen(true)} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>+ Add Your First Slab</button>
+              </div>} />
+            ) : (
             <Card style={{ padding: 0, minWidth: 900 }} ch={<table>
               <thead><tr><th>BARCODE</th><th>NAME</th><th>TYPE</th><th>SQFT</th><th>STOCK</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>RESERVED</th><th>ACTIONS</th></tr></thead>
               <tbody>{filtered.map(s => {
@@ -968,6 +992,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                 </tr>);
               })}</tbody>
             </table>} />
+            )}
           </div>
         </div>}
 
@@ -1392,6 +1417,45 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                 setStaffPinOpen(false); setNewStaffPin("");
                 notify(`✓ Staff PIN set to ${newStaffPin}`);
               }} style={{ flex: 1, background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Save PIN</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── WELCOME MODAL ── */}
+      {showWelcome && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.6)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(0,0,0,0.3)", overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(135deg, #0f2240, #1e3a5f)", padding: "28px 28px 24px", textAlign: "center" }}>
+              <div style={{ width: 52, height: 52, background: "#fff", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                <svg width="28" height="28" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
+              </div>
+              <div style={{ color: "#fff", fontWeight: 900, fontSize: 22, marginBottom: 6 }}>Welcome to StoneTrack! 🎉</div>
+              <div style={{ color: "#93c5fd", fontSize: 13 }}>Let's get your inventory set up in 3 easy steps</div>
+            </div>
+            <div style={{ padding: "24px 28px" }}>
+              {[
+                { icon: "📦", title: "Add your first slab", desc: "Enter your marble or granite stock — name, quantity, price and location in your yard", action: "Add Slab Now", fn: () => { setShowWelcome(false); setAddSlabOpen(true); } },
+                { icon: "🗺️", title: "Set up your yard blocks", desc: "Organise your yard into blocks A–F so staff can find any slab instantly by location", action: "Go to Yard Map", fn: () => { setShowWelcome(false); setTab("yard"); } },
+                { icon: "🔒", title: "Set a Staff PIN", desc: "Give your staff a 4-digit PIN to check stock on their phone — without seeing prices or financials", action: "Set PIN", fn: () => { setShowWelcome(false); setStaffPinOpen(true); } },
+                { icon: "👥", title: "Add a customer account", desc: "Track contractor and builder purchases, payments and outstanding dues all in one place", action: "Add Customer", fn: () => { setShowWelcome(false); setTab("customers"); setAddCustOpen(true); } },
+              ].map((step, i) => (
+                <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 20, opacity: welcomeStep === i ? 1 : 0.45, transition: "opacity 0.3s" }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 12, background: welcomeStep === i ? "#1e3a5f" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{welcomeStep > i ? "✅" : step.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "#1e3a5f", marginBottom: 3 }}>{step.title}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, marginBottom: welcomeStep === i ? 10 : 0 }}>{step.desc}</div>
+                    {welcomeStep === i && <button onClick={step.fn} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{step.action} →</button>}
+                  </div>
+                  <div style={{ width: 24, height: 24, borderRadius: "50%", border: `2px solid ${welcomeStep > i ? "#16a34a" : welcomeStep === i ? "#1e3a5f" : "#e2e8f0"}`, background: welcomeStep > i ? "#16a34a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, color: "#fff", fontWeight: 700 }}>{welcomeStep > i ? "✓" : i + 1}</div>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+                <button onClick={() => setShowWelcome(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 13, cursor: "pointer" }}>Skip for now</button>
+                {welcomeStep < 3
+                  ? <button onClick={() => setWelcomeStep(s => s + 1)} style={{ background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Next step →</button>
+                  : <button onClick={() => setShowWelcome(false)} style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Let's go! 🎉</button>}
+              </div>
             </div>
           </div>
         </div>
