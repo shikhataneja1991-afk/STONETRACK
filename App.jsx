@@ -190,7 +190,53 @@ const AuthScreen = ({ onBack }) => {
   );
 };
 
-// ─── QR LABEL MODAL ───────────────────────────────────────────────────────────
+// ─── UI HELPER COMPONENTS (defined at top level to prevent re-render cursor bug) ─
+const Inp = ({ label, ...p }) => (
+  <div>
+    {label && <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 4, letterSpacing: 0.3 }}>{label}</div>}
+    <input style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a", padding: "9px 12px", borderRadius: 7, width: "100%", fontSize: 15, fontFamily: "'DM Sans',sans-serif", outline: "none" }}
+      onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} {...p} />
+  </div>
+);
+const Sel = ({ label, options, ...p }) => (
+  <div>
+    {label && <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>{label}</div>}
+    <select style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a", padding: "9px 12px", borderRadius: 7, width: "100%", fontSize: 15, fontFamily: "'DM Sans',sans-serif", outline: "none" }} {...p}>
+      {options.map(o => <option key={o}>{o}</option>)}
+    </select>
+  </div>
+);
+const Btn = ({ ch, v = "p", sm, onClick, disabled }) => (
+  <button onClick={onClick} disabled={disabled} style={{ background: disabled ? "#e2e8f0" : v === "p" ? "#1e3a5f" : v === "d" ? "#dc2626" : v === "g2" ? "#059669" : "#fff", border: v === "g" ? "1.5px solid #e2e8f0" : "none", color: disabled ? "#94a3b8" : v === "g" ? "#334155" : "#fff", padding: sm ? "6px 13px" : "10px 22px", borderRadius: 7, fontFamily: "'DM Sans',sans-serif", fontSize: sm ? 12 : 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>{ch}</button>
+);
+const Card = ({ ch, style }) => (
+  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 20, boxShadow: "0 1px 5px rgba(30,58,95,0.05)", ...style }}>{ch}</div>
+);
+const StatCard = ({ label, value, sub, color, icon }) => (
+  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${color}`, borderRadius: 10, padding: 18, boxShadow: "0 1px 5px rgba(30,58,95,0.05)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.8 }}>{label.toUpperCase()}</div>
+      <span style={{ fontSize: 18 }}>{icon}</span>
+    </div>
+    <div style={{ fontSize: 24, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 5 }}>{sub}</div>}
+  </div>
+);
+const Mdl = ({ title, sub, onClose, wide, ch }) => (
+  <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.4)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={{ background: "#fff", borderRadius: 13, padding: 28, width: "100%", maxWidth: wide ? 680 : 500, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(15,36,68,0.2)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <div><div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>{title}</div>{sub && <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{sub}</div>}</div>
+        <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, width: 30, height: 30, cursor: "pointer", fontSize: 15, color: "#64748b" }}>✕</button>
+      </div>
+      <div style={{ height: 1, background: "#f1f5f9", marginBottom: 18 }} />
+      {ch}
+    </div>
+  </div>
+);
+const HR = () => <div style={{ height: 1, background: "#f1f5f9", margin: "18px 0" }} />;
+
+
 const QRLabel = ({ slab, onClose }) => (
   <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.55)", zIndex: 500, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && onClose()}>
     <div style={{ background: "#fff", borderRadius: "16px 16px 0 0", padding: "24px 20px 32px", maxWidth: 480, width: "100%", boxShadow: "0 -8px 40px rgba(0,0,0,0.2)" }}>
@@ -736,51 +782,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     (fType === "All" || s.type === fType) && (fStatus === "All" || s.status === fStatus) && (fBlock === "All" || s.block === fBlock)
   ), [slabs, search, fType, fStatus, fBlock]);
 
-  // ── UI HELPERS ──
-  const Inp = ({ label, ...p }) => (
-    <div>
-      {label && <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 5 }}>{label}</div>}
-      <input style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a", padding: "11px 13px", borderRadius: 8, width: "100%", fontSize: 16, fontFamily: "'DM Sans',sans-serif", outline: "none", minHeight: 44 }}
-        onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} {...p} />
-    </div>
-  );
-  const Sel = ({ label, options, ...p }) => (
-    <div>
-      {label && <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 5 }}>{label}</div>}
-      <select style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a", padding: "11px 13px", borderRadius: 8, width: "100%", fontSize: 16, fontFamily: "'DM Sans',sans-serif", outline: "none", minHeight: 44 }} {...p}>
-        {options.map(o => <option key={o}>{o}</option>)}
-      </select>
-    </div>
-  );
-  const Btn = ({ ch, v = "p", sm, full, onClick, disabled }) => (
-    <button onClick={onClick} disabled={disabled}
-      style={{ background: disabled ? "#e2e8f0" : v === "p" ? "#1e3a5f" : v === "d" ? "#dc2626" : v === "g2" ? "#059669" : "#fff", border: v === "g" ? "1.5px solid #e2e8f0" : "none", color: disabled ? "#94a3b8" : v === "g" ? "#334155" : "#fff", padding: sm ? "8px 13px" : "11px 22px", borderRadius: 8, fontFamily: "'DM Sans',sans-serif", fontSize: sm ? 12 : 14, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", width: full ? "100%" : undefined, whiteSpace: "nowrap", transition: "opacity 0.15s", minHeight: sm ? 34 : 42, WebkitTapHighlightColor: "transparent" }}
-      onMouseEnter={e => !disabled && (e.currentTarget.style.opacity = "0.82")} onMouseLeave={e => (e.currentTarget.style.opacity = "1")}>{ch}</button>
-  );
-  const Card = ({ ch, style }) => <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, boxShadow: "0 1px 5px rgba(30,58,95,0.05)", ...style }}>{ch}</div>;
-  const Mdl = ({ title, sub, onClose, wide, ch }) => (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,36,68,0.45)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: "#fff", borderRadius: "16px 16px 0 0", padding: "24px 20px 32px", width: "100%", maxWidth: wide ? 700 : 520, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 -8px 40px rgba(15,36,68,0.2)" }}>
-        <div style={{ width: 40, height: 4, background: "#e2e8f0", borderRadius: 2, margin: "0 auto 16px" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-          <div><div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>{title}</div>{sub && <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{sub}</div>}</div>
-          <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: 8, width: 36, height: 36, cursor: "pointer", fontSize: 15, color: "#64748b", flexShrink: 0 }}>✕</button>
-        </div>
-        <div style={{ height: 1, background: "#f1f5f9", marginBottom: 18 }} />{ch}
-      </div>
-    </div>
-  );
-  const HR = () => <div style={{ height: 1, background: "#f1f5f9", margin: "18px 0" }} />;
-  const StatCard = ({ label, value, sub, color, icon }) => (
-    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${color}`, borderRadius: 10, padding: 16, boxShadow: "0 1px 5px rgba(30,58,95,0.05)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.8 }}>{label.toUpperCase()}</div>
-        <span style={{ fontSize: 18 }}>{icon}</span>
-      </div>
-      <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 5 }}>{sub}</div>}
-    </div>
-  );
+
 
   const TABS = [
     { k: "dashboard", l: "Dashboard", i: "▦" }, { k: "inventory", l: "Inventory", i: "◈" },
