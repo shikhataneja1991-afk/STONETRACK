@@ -1062,39 +1062,93 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
         {/* YARD MAP */}
         {tab === "yard" && <div className="fu">
           <div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f", marginBottom: 4 }}>Yard Layout Map</div>
-          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 18 }}>Tap a block to see stored slabs</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 18 }}>
-            {BLOCKS.map(block => {
-              const bs = slabs.filter(s => s.block === block);
-              const hasAlert = bs.some(s => s.status !== "In Stock");
-              return (
-                <div key={block} onClick={() => setYardBlock(yardBlock === block ? null : block)} style={{ background: yardBlock === block ? "#f0f6ff" : "#fff", border: `2px solid ${yardBlock === block ? "#1e3a5f" : hasAlert ? "#d97706" : "#e2e8f0"}`, borderRadius: 10, padding: 16, cursor: "pointer", transition: "all 0.2s" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f" }}>Block {block}</div>
-                    {hasAlert && <span>🟡</span>}
+          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 18 }}>Tap a block to see what's stored there · Assign slabs via Inventory → Edit</div>
+
+          {slabs.length === 0 ? (
+            <Card ch={<div style={{ textAlign: "center", padding: "48px 20px" }}>
+              <div style={{ fontSize: 48, marginBottom: 10 }}>🗺️</div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: "#1e3a5f", marginBottom: 6 }}>No inventory yet</div>
+              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>Add slabs and assign them to blocks to see your yard map</div>
+              <button onClick={() => setTab("inventory")} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Go to Inventory</button>
+            </div>} />
+          ) : (<>
+            {/* Block grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
+              {BLOCKS.map(block => {
+                const bs = slabs.filter(s => s.block === block);
+                const outCount = bs.filter(s => s.status === "Out of Stock").length;
+                const lowCount = bs.filter(s => s.status === "Low Stock").length;
+                const isActive = yardBlock === block;
+                const borderColor = isActive ? "#1e3a5f" : outCount > 0 ? "#dc2626" : lowCount > 0 ? "#d97706" : bs.length > 0 ? "#16a34a" : "#e2e8f0";
+                return (
+                  <div key={block} onClick={() => setYardBlock(isActive ? null : block)}
+                    style={{ background: isActive ? "#1e3a5f" : "#fff", border: `2px solid ${borderColor}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "all 0.2s", boxShadow: isActive ? "0 4px 16px rgba(30,58,95,0.2)" : "0 1px 4px rgba(0,0,0,0.05)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ fontWeight: 900, fontSize: 28, color: isActive ? "#fff" : "#1e3a5f" }}>Block {block}</div>
+                      {outCount > 0 && <span style={{ fontSize: 14 }}>🔴</span>}
+                      {!outCount && lowCount > 0 && <span style={{ fontSize: 14 }}>🟡</span>}
+                      {!outCount && !lowCount && bs.length > 0 && <span style={{ fontSize: 14 }}>🟢</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: isActive ? "#93c5fd" : "#64748b", marginBottom: 10 }}>
+                      {bs.length === 0 ? "Empty" : `${bs.length} item${bs.length > 1 ? "s" : ""} · ${bs.reduce((s, i) => s + i.qty, 0)} sqft`}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {bs.map(s => (
+                        <div key={s.id} title={`${s.name} · ${s.qty} sqft`}
+                          style={{ width: 14, height: 14, borderRadius: 3, background: stc(s.status), border: "1px solid rgba(255,255,255,0.3)" }} />
+                      ))}
+                      {bs.length === 0 && <span style={{ fontSize: 10, color: isActive ? "#64748b" : "#cbd5e1" }}>No items</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>{bs.length} types · {bs.reduce((s, i) => s + i.qty, 0)} slabs</div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {bs.map(s => <div key={s.id} title={s.name} style={{ width: 12, height: 12, borderRadius: 3, background: stc(s.status) }} />)}
-                    {bs.length === 0 && <span style={{ fontSize: 11, color: "#cbd5e1" }}>Empty</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {yardBlock && <Card ch={<>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#1e3a5f", marginBottom: 14 }}>Block {yardBlock}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 10 }}>
-              {slabs.filter(s => s.block === yardBlock).map(s => (
-                <div key={s.id} style={{ background: stb(s.status), borderTop: `3px solid ${stc(s.status)}`, borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontFamily: "monospace", fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>{s.barcode}</div>
-                  <div style={{ fontWeight: 700, color: "#1e3a5f", marginBottom: 2 }}>{s.name}</div>
-                  <div style={{ fontWeight: 800, fontSize: 20, color: stc(s.status) }}>{s.qty} <span style={{ fontSize: 10, fontWeight: 400, color: "#94a3b8" }}>slabs</span></div>
-                  {s.reserved_for && <div style={{ fontSize: 10, color: "#d97706", fontWeight: 600, marginTop: 4 }}>📌 {s.reserved_for}</div>}
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </>} />}
+
+            {/* Selected block detail */}
+            {yardBlock && (() => {
+              const bs = slabs.filter(s => s.block === yardBlock);
+              return (
+                <Card ch={<>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontWeight: 800, fontSize: 18, color: "#1e3a5f" }}>Block {yardBlock} — Details</div>
+                    <button onClick={() => setYardBlock(null)} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, width: 28, height: 28, cursor: "pointer", color: "#64748b", fontSize: 14 }}>✕</button>
+                  </div>
+                  {bs.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 13 }}>Block {yardBlock} is empty — assign items here via Inventory → Edit</div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 10 }}>
+                      {bs.map(s => (
+                        <div key={s.id} style={{ background: stb(s.status), borderTop: `3px solid ${stc(s.status)}`, borderRadius: 10, padding: 14 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                            <div>
+                              <div style={{ fontFamily: "monospace", fontSize: 10, color: "#94a3b8", marginBottom: 2 }}>{s.barcode}</div>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: "#1e3a5f" }}>{s.name}</div>
+                              <div style={{ fontSize: 11, color: "#64748b" }}>{s.type} · {s.variety || ""}</div>
+                            </div>
+                            <span style={{ background: stc(s.status) + "22", color: stc(s.status), borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700 }}>{s.status}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                            <div>
+                              <div style={{ fontWeight: 900, fontSize: 22, color: stc(s.status), lineHeight: 1 }}>{s.qty}</div>
+                              <div style={{ fontSize: 10, color: "#94a3b8" }}>sqft</div>
+                            </div>
+                            <div style={{ textAlign: "right", fontSize: 11, color: "#64748b" }}>
+                              <div>Row {s.row_no} · Slot {s.slot_no}</div>
+                              {s.reserved_for && <div style={{ color: "#d97706", fontWeight: 600, marginTop: 2 }}>📌 {s.reserved_for}</div>}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                            <button onClick={() => setSaleTarget(s)} style={{ flex: 1, background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, padding: "6px 0", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Sell</button>
+                            <button onClick={() => setPrintTarget(s)} style={{ flex: 1, background: "#f1f5f9", color: "#1e3a5f", border: "none", borderRadius: 6, padding: "6px 0", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>QR</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>} />
+              );
+            })()}
+          </>)}
         </div>}
 
         {/* QR CODES */}
