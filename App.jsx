@@ -39,7 +39,20 @@ const QRCode = ({ value, size = 80 }) => {
 };
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const STONE_TYPES = ["Marble", "Granite", "Slate", "Quartzite", "Limestone", "Onyx"];
+const STONE_TYPES = ["Granite", "Marble", "Quartz", "15mm Slab", "Sanitary", "Adhesive Gum", "Epoxy", "Spacer", "Tile Joint Filler", "PVC Beading", "T-Patti Beading"];
+const STONE_CATEGORIES = [
+  { k: "Granite",          i: "🪨", color: "#7c3aed" },
+  { k: "Marble",           i: "🤍", color: "#2563eb" },
+  { k: "Quartz",           i: "💎", color: "#0369a1" },
+  { k: "15mm Slab",        i: "▭",  color: "#1e3a5f" },
+  { k: "Sanitary",         i: "🚿", color: "#0891b2" },
+  { k: "Adhesive Gum",     i: "🟡", color: "#d97706" },
+  { k: "Epoxy",            i: "🔵", color: "#7c3aed" },
+  { k: "Spacer",           i: "⬜", color: "#64748b" },
+  { k: "Tile Joint Filler",i: "🟫", color: "#92400e" },
+  { k: "PVC Beading",      i: "📏", color: "#059669" },
+  { k: "T-Patti Beading",  i: "📐", color: "#dc2626" },
+];
 const FINISHES = ["Polished", "Honed", "Brushed", "Sandblasted", "Natural", "Leathered"];
 const VARIETIES = ["Italian", "Indian", "Spanish", "Turkish", "Brazilian", "Chinese"];
 const BLOCKS = ["A", "B", "C", "D", "E", "F"];
@@ -626,6 +639,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
   const [newStaffPin, setNewStaffPin] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeStep, setWelcomeStep] = useState(0);
+  const [invCat, setInvCat] = useState("Granite");
 
   // modals
   const [addSlabOpen, setAddSlabOpen] = useState(false);
@@ -676,7 +690,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     const threshold = +ns.threshold;
     const barcode = `ST-${String(slabs.length + 1).padStart(3, "0")}`;
     const { data, error } = await sb.from("slabs").insert({
-      business_id: business.id, name: ns.name, type: ns.type, variety: ns.variety, finish: ns.finish,
+      business_id: business.id, name: ns.name, type: ns.type || invCat, variety: ns.variety, finish: ns.finish,
       length: +ns.length, width: +ns.width, sqft: sqftPerSlab, qty: totalQty, price_per_sqft: +ns.pricePerSqft,
       cost_per_sqft: +ns.costPerSqft || 0, block: ns.block, row_no: +ns.row, slot_no: +ns.slot,
       threshold, supplier: ns.supplier, barcode, status: getStatus(totalQty, threshold)
@@ -956,60 +970,93 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
           </>} />
         </div>}
 
-        {/* INVENTORY */}
+        {/* INVENTORY — CATEGORY BASED */}
         {tab === "inventory" && <div className="fu">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-            <div><div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f" }}>Slab Inventory</div><div style={{ color: "#64748b", fontSize: 13 }}>{filtered.length} / {slabs.length} slabs</div></div>
-            <Btn ch="+ Add Slab" onClick={() => setAddSlabOpen(true)} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+            <div><div style={{ fontWeight: 800, fontSize: 20, color: "#1e3a5f" }}>Inventory</div><div style={{ color: "#64748b", fontSize: 13 }}>{slabs.length} items across {STONE_CATEGORIES.length} categories</div></div>
+            <Btn ch="+ Add Item" onClick={() => setAddSlabOpen(true)} />
           </div>
-          <Card style={{ marginBottom: 12, padding: 12 }} ch={<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <input style={{ flex: 1, minWidth: 160, border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "9px 12px", fontSize: 14, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "#f8faff", minHeight: 42 }} placeholder="🔍 Name or barcode..." value={search} onChange={e => setSearch(e.target.value)} />
-            {[["All", ...STONE_TYPES], ["All", "In Stock", "Low Stock", "Out of Stock"], ["All", ...BLOCKS.map(b => `Block ${b}`)]].map((opts, i) => (
-              <select key={i} value={[fType, fStatus, fBlock][i]} onChange={e => [setFType, setFStatus, setFBlock][i](e.target.value.replace("Block ", ""))} style={{ border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "#fff", minHeight: 42 }}>
-                {opts.map(o => <option key={o}>{o}</option>)}
-              </select>
-            ))}
-          </div>} />
-          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            {slabs.length === 0 ? (
-              <Card ch={<div style={{ textAlign: "center", padding: "48px 20px" }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
-                <div style={{ fontWeight: 700, fontSize: 18, color: "#1e3a5f", marginBottom: 8 }}>No slabs yet</div>
-                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 20 }}>Add your marble and granite inventory to get started</div>
-                <button onClick={() => setAddSlabOpen(true)} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>+ Add Your First Slab</button>
-              </div>} />
-            ) : (
-            <Card style={{ padding: 0, minWidth: 900 }} ch={<table>
-              <thead><tr><th>BARCODE</th><th>NAME</th><th>TYPE</th><th>SIZE (ft)</th><th>SLABS</th><th>SQ.FT</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>RESERVED</th><th>ACTIONS</th></tr></thead>
-              <tbody>{filtered.map(s => {
-                const margin = s.price_per_sqft > 0 ? (((s.price_per_sqft - s.cost_per_sqft) / s.price_per_sqft) * 100).toFixed(0) : 0;
-                const slabCount = s.sqft > 0 ? Math.floor(s.qty / s.sqft) : "—";
-                return (<tr key={s.id}>
-                  <td><span style={{ fontFamily: "monospace", fontSize: 11, background: "#f0f6ff", color: "#1e3a5f", padding: "2px 7px", borderRadius: 4, fontWeight: 700 }}>{s.barcode}</span></td>
-                  <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{s.name}</td>
-                  <td><span style={{ background: s.type === "Marble" ? "#dbeafe" : s.type === "Granite" ? "#fce7f3" : "#f0fdf4", color: s.type === "Marble" ? "#1d4ed8" : s.type === "Granite" ? "#9d174d" : "#166534", borderRadius: 5, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{s.type}</span></td>
-                  <td style={{ fontSize: 12, color: "#64748b", fontFamily: "monospace" }}>{s.length && s.width ? `${s.length}×${s.width}` : "—"}</td>
-                  <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{slabCount}</td>
-                  <td style={{ fontWeight: 800, fontSize: 15, color: s.qty === 0 ? "#dc2626" : "#2563eb" }}>{s.qty} <span style={{ fontSize: 10, fontWeight: 400, color: "#94a3b8" }}>sqft</span></td>
-                  <td style={{ color: "#64748b" }}>{s.block}</td>
-                  <td style={{ color: "#16a34a", fontWeight: 600 }}>{fmtINR(s.price_per_sqft)}</td>
-                  <td style={{ color: "#dc2626", fontSize: 12 }}>{fmtINR(s.cost_per_sqft)}</td>
-                  <td><span style={{ color: +margin > 30 ? "#16a34a" : +margin > 15 ? "#d97706" : "#dc2626", fontWeight: 700 }}>{margin}%</span></td>
-                  <td><span style={{ background: stb(s.status), color: stc(s.status), borderRadius: 5, padding: "3px 9px", fontSize: 11, fontWeight: 700 }}>{s.status}</span></td>
-                  <td style={{ fontSize: 11, color: s.reserved_for ? "#d97706" : "#cbd5e1" }}>{s.reserved_for || "—"}</td>
-                  <td><div style={{ display: "flex", gap: 4 }}>
-                    <Btn sm ch="View" v="g" onClick={() => setDetailTarget(s)} />
-                    <Btn sm ch="Sell" onClick={() => setSaleTarget(s)} />
-                    <Btn sm ch="QR" v="g" onClick={() => setPrintTarget(s)} />
-                    <Btn sm ch="Edit" v="g" onClick={() => setEditSlabData({ ...s })} />
-                    <Btn sm ch="Dmg" v="d" onClick={() => setDamageTarget(s)} />
-                    <Btn sm ch="🗑" v="d" onClick={async () => { if (window.confirm(`Delete "${s.name}"? This cannot be undone.`)) { await sb.from("slabs").delete().eq("id", s.id); setSlabs(p => p.filter(x => x.id !== s.id)); notify("Slab deleted"); } }} />
-                  </div></td>
-                </tr>);
-              })}</tbody>
-            </table>} />
-            )}
+
+          {/* Category grid overview */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))", gap: 8, marginBottom: 16 }}>
+            {STONE_CATEGORIES.map(cat => {
+              const catSlabs = slabs.filter(s => s.type === cat.k);
+              const hasAlert = catSlabs.some(s => s.status !== "In Stock");
+              const isActive = invCat === cat.k;
+              return (
+                <div key={cat.k} onClick={() => setInvCat(cat.k)}
+                  style={{ background: isActive ? cat.color : "#fff", border: `2px solid ${isActive ? cat.color : "#e2e8f0"}`, borderRadius: 10, padding: "12px 10px", cursor: "pointer", textAlign: "center", transition: "all 0.2s" }}>
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>{cat.i}</div>
+                  <div style={{ fontWeight: 700, fontSize: 11, color: isActive ? "#fff" : "#1e3a5f", lineHeight: 1.2, marginBottom: 4 }}>{cat.k}</div>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: isActive ? "#fff" : cat.color }}>{catSlabs.length}</div>
+                  <div style={{ fontSize: 9, color: isActive ? "rgba(255,255,255,0.7)" : "#94a3b8" }}>items</div>
+                  {hasAlert && <div style={{ fontSize: 9, color: isActive ? "#fef08a" : "#dc2626", fontWeight: 700, marginTop: 2 }}>⚠ alert</div>}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Active category detail */}
+          {(() => {
+            const cat = STONE_CATEGORIES.find(c => c.k === invCat);
+            const catSlabs = slabs.filter(s => s.type === invCat).filter(s =>
+              s.name.toLowerCase().includes(search.toLowerCase()) || (s.barcode || "").toLowerCase().includes(search.toLowerCase())
+            );
+            return (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: cat.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{cat.i}</div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a5f" }}>{invCat}</div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{catSlabs.length} items</div>
+                    </div>
+                  </div>
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search name or barcode..."
+                    style={{ border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 14, fontFamily: "'DM Sans',sans-serif", outline: "none", background: "#f8faff", minWidth: 220 }} />
+                </div>
+
+                {catSlabs.length === 0 ? (
+                  <Card ch={<div style={{ textAlign: "center", padding: "40px 20px" }}>
+                    <div style={{ fontSize: 40, marginBottom: 10 }}>{cat.i}</div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: "#1e3a5f", marginBottom: 6 }}>No {invCat} items yet</div>
+                    <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>Add your first {invCat} item to this category</div>
+                    <button onClick={() => { setNs(p => ({ ...p, type: invCat })); setAddSlabOpen(true); }}
+                      style={{ background: cat.color, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ Add {invCat} Item</button>
+                  </div>} />
+                ) : (
+                  <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                    <Card style={{ padding: 0, minWidth: 800 }} ch={<table>
+                      <thead><tr><th>BARCODE</th><th>NAME</th><th>SIZE (ft)</th><th>SLABS</th><th>SQ.FT / QTY</th><th>BLOCK</th><th>SELL ₹</th><th>COST ₹</th><th>MARGIN</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+                      <tbody>{catSlabs.map(s => {
+                        const margin = s.price_per_sqft > 0 ? (((s.price_per_sqft - s.cost_per_sqft) / s.price_per_sqft) * 100).toFixed(0) : 0;
+                        const slabCount = s.sqft > 0 ? Math.floor(s.qty / s.sqft) : "—";
+                        return (<tr key={s.id}>
+                          <td><span style={{ fontFamily: "monospace", fontSize: 11, background: "#f0f6ff", color: "#1e3a5f", padding: "2px 7px", borderRadius: 4, fontWeight: 700 }}>{s.barcode}</span></td>
+                          <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{s.name}</td>
+                          <td style={{ fontSize: 12, color: "#64748b", fontFamily: "monospace" }}>{s.length && s.width ? `${s.length}×${s.width}` : "—"}</td>
+                          <td style={{ fontWeight: 700, color: "#1e3a5f" }}>{slabCount}</td>
+                          <td style={{ fontWeight: 800, fontSize: 15, color: s.qty === 0 ? "#dc2626" : cat.color }}>{s.qty} <span style={{ fontSize: 10, fontWeight: 400, color: "#94a3b8" }}>sqft</span></td>
+                          <td style={{ color: "#64748b" }}>{s.block}</td>
+                          <td style={{ color: "#16a34a", fontWeight: 600 }}>{fmtINR(s.price_per_sqft)}</td>
+                          <td style={{ color: "#dc2626", fontSize: 12 }}>{fmtINR(s.cost_per_sqft)}</td>
+                          <td><span style={{ color: +margin > 30 ? "#16a34a" : +margin > 15 ? "#d97706" : "#dc2626", fontWeight: 700 }}>{margin}%</span></td>
+                          <td><span style={{ background: stb(s.status), color: stc(s.status), borderRadius: 5, padding: "3px 9px", fontSize: 11, fontWeight: 700 }}>{s.status}</span></td>
+                          <td><div style={{ display: "flex", gap: 4 }}>
+                            <Btn sm ch="View" v="g" onClick={() => setDetailTarget(s)} />
+                            <Btn sm ch="Sell" onClick={() => setSaleTarget(s)} />
+                            <Btn sm ch="QR" v="g" onClick={() => setPrintTarget(s)} />
+                            <Btn sm ch="Edit" v="g" onClick={() => setEditSlabData({ ...s })} />
+                            <Btn sm ch="🗑" v="d" onClick={async () => { if (window.confirm(`Delete "${s.name}"?`)) { await sb.from("slabs").delete().eq("id", s.id); setSlabs(p => p.filter(x => x.id !== s.id)); notify("Deleted"); } }} />
+                          </div></td>
+                        </tr>);
+                      })}</tbody>
+                    </table>} />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>}
 
         {/* YARD MAP */}
@@ -1294,9 +1341,9 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
       </main>
 
       {/* ── MODALS ── */}
-      {addSlabOpen && <Mdl title="Add New Slab" onClose={() => setAddSlabOpen(false)} wide ch={<>
+      {addSlabOpen && <Mdl title={`Add New Item — ${invCat}`} onClose={() => setAddSlabOpen(false)} wide ch={<>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="g2"><Inp label="Slab Name *" placeholder="e.g. Carrara White" value={ns.name} onChange={e => setNs(p => ({ ...p, name: e.target.value }))} /><Sel label="Type" options={STONE_TYPES} value={ns.type} onChange={e => setNs(p => ({ ...p, type: e.target.value }))} /></div>
+          <div className="g2"><Inp label="Item Name *" placeholder="e.g. Carrara White" value={ns.name} onChange={e => setNs(p => ({ ...p, name: e.target.value }))} /><Sel label="Category" options={STONE_TYPES} value={ns.type || invCat} onChange={e => setNs(p => ({ ...p, type: e.target.value }))} /></div>
           <div className="g2"><Sel label="Variety" options={VARIETIES} value={ns.variety} onChange={e => setNs(p => ({ ...p, variety: e.target.value }))} /><Sel label="Finish" options={FINISHES} value={ns.finish} onChange={e => setNs(p => ({ ...p, finish: e.target.value }))} /></div>
           <div className="g2"><Inp label="Length (ft)" type="number" placeholder="e.g. 8" value={ns.length} onChange={e => setNs(p => ({ ...p, length: e.target.value }))} /><Inp label="Width (ft)" type="number" placeholder="e.g. 4" value={ns.width} onChange={e => setNs(p => ({ ...p, width: e.target.value }))} /></div>
           <div className="g2">
