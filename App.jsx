@@ -1,42 +1,32 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
 
-// ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://sksqrbflfntexujqdwzc.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrc3FyYmZsZm50ZXh1anFkd3pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTU0NDcsImV4cCI6MjA4ODczMTQ0N30.kKJ9ZeF8D_rCMA1MR2cGR4IxNCuntu1xNYR1kv0EaSI";
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+// ─── API CLIENT ───────────────────────────────────────────────────────────────
+const API_URL = "https://getstocklog-api.onrender.com"; // ← update after Render deploy
 
-// ─── QR CODE ──────────────────────────────────────────────────────────────────
-function generateQRMatrix(data) {
-  const size = 21;
-  const matrix = Array.from({ length: size }, () => Array(size).fill(0));
-  const finder = (r, c) => { for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) { if (i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4)) if (r + i < size && c + j < size) matrix[r + i][c + j] = 1; } };
-  finder(0, 0); finder(0, 14); finder(14, 0);
-  for (let i = 8; i < 13; i++) { matrix[6][i] = i % 2 === 0 ? 1 : 0; matrix[i][6] = i % 2 === 0 ? 1 : 0; }
-  let hash = 5381;
-  for (let i = 0; i < data.length; i++) hash = ((hash << 5) + hash + data.charCodeAt(i)) | 0;
-  const bits = []; let h = Math.abs(hash) + data.length * 1337;
-  for (let i = 0; i < 220; i++) { bits.push(h & 1); h = ((h >>> 1) ^ (0xEDB88320 * (i % 7 === 0 ? 1 : 0) + data.charCodeAt(i % data.length) * 17)) | 0; h = Math.abs(h); }
-  const forbidden = new Set();
-  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) forbidden.add(`${r},${c}`);
-  for (let r = 0; r < 8; r++) for (let c = 13; c < 21; c++) forbidden.add(`${r},${c}`);
-  for (let r = 13; r < 21; r++) for (let c = 0; c < 8; c++) forbidden.add(`${r},${c}`);
-  for (let i = 6; i <= 6; i++) for (let j = 6; j < 15; j++) forbidden.add(`${i},${j}`);
-  for (let i = 6; i < 15; i++) forbidden.add(`${i},6`);
-  let bi = 0;
-  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (!forbidden.has(`${r},${c}`) && bi < bits.length) matrix[r][c] = bits[bi++];
-  return matrix;
-}
+const api = async (path, method = "GET", body = null) => {
+  const token = localStorage.getItem("gsl_token");
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Request failed");
+  return data;
+};
+
+// ─── REAL QR CODE (uses Google Charts API to generate scannable QR) ───────────
 const QRCode = ({ value, size = 80 }) => {
-  const matrix = useMemo(() => generateQRMatrix(value), [value]);
-  const cells = matrix.length; const cell = size / cells;
+  const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&bgcolor=ffffff&color=1e3a5f&margin=2`;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ borderRadius: 3, display: "block", flexShrink: 0 }}>
-      <rect width={size} height={size} fill="#fff" rx={3} />
-      {matrix.map((row, r) => row.map((on, c) => on ? <rect key={`${r}-${c}`} x={c * cell + 0.3} y={r * cell + 0.3} width={cell - 0.3} height={cell - 0.3} fill="#1e3a5f" rx={0.2} /> : null))}
-    </svg>
+    <img src={url} width={size} height={size} alt={value}
+      style={{ borderRadius: 4, display: "block", flexShrink: 0 }} />
   );
 };
+
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const STONE_TYPES = ["Granite", "Marble", "Quartz", "15mm Slab", "Sanitary", "Adhesive Gum", "Epoxy", "Spacer", "Tile Joint Filler", "PVC Beading", "T-Patti Beading"];
@@ -72,7 +62,7 @@ const Loader = ({ msg = "Loading..." }) => (
         <rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f" /><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6" />
       </svg>
     </div>
-    <div style={{ color: "#fff", fontWeight: 700, fontSize: 18, letterSpacing: 2, marginBottom: 8 }}>STONETRACK</div>
+    <div style={{ color: "#fff", fontWeight: 700, fontSize: 18, letterSpacing: 2, marginBottom: 8 }}>GETSTOCKLOG</div>
     <div style={{ color: "#64748b", fontSize: 13 }}>{msg}</div>
     <div style={{ marginTop: 24, width: 40, height: 4, background: "#1e3a5f", borderRadius: 2, overflow: "hidden" }}>
       <div style={{ width: "100%", height: "100%", background: "#3b82f6", borderRadius: 2, animation: "loading 1.2s ease-in-out infinite" }} />
@@ -82,8 +72,8 @@ const Loader = ({ msg = "Loading..." }) => (
 );
 
 // ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
-const AuthScreen = ({ onBack }) => {
-  const [mode, setMode] = useState("login"); // login | signup
+const AuthScreen = ({ onBack, onAuth }) => {
+  const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ email: "", password: "", businessName: "", ownerName: "", phone: "", city: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -91,20 +81,12 @@ const AuthScreen = ({ onBack }) => {
   const handleLogin = async () => {
     if (!form.email || !form.password) { setError("Enter email and password"); return; }
     setLoading(true); setError("");
-    const { data, error: err } = await sb.auth.signInWithPassword({ email: form.email, password: form.password });
-    if (err) { setError(err.message); setLoading(false); return; }
-    // If logged in but no business yet, create one
-    if (data.user) {
-      const { data: biz } = await sb.from("businesses").select("id").eq("owner_id", data.user.id).single();
-      if (!biz) {
-        await sb.from("businesses").insert({
-          owner_id: data.user.id,
-          business_name: form.businessName || "My Marble Business",
-          owner_name: form.ownerName || "",
-          phone: form.phone || "",
-          city: form.city || ""
-        });
-      }
+    try {
+      const data = await api("/api/auth/login", "POST", { email: form.email, password: form.password });
+      localStorage.setItem("gsl_token", data.token);
+      onAuth(data.business);
+    } catch (err) {
+      setError(err.message);
     }
     setLoading(false);
   };
@@ -113,25 +95,16 @@ const AuthScreen = ({ onBack }) => {
     if (!form.email || !form.password || !form.businessName || !form.ownerName) { setError("Fill all required fields"); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true); setError("");
-    // Try login first in case user already exists
-    const { data: loginData } = await sb.auth.signInWithPassword({ email: form.email, password: form.password });
-    if (loginData?.user) {
-      const { data: biz } = await sb.from("businesses").select("id").eq("owner_id", loginData.user.id).single();
-      if (!biz) {
-        await sb.from("businesses").insert({
-          owner_id: loginData.user.id, business_name: form.businessName,
-          owner_name: form.ownerName, phone: form.phone, city: form.city
-        });
-      }
-      setLoading(false); return;
-    }
-    const { data, error: err } = await sb.auth.signUp({ email: form.email, password: form.password });
-    if (err) { setError(err.message); setLoading(false); return; }
-    if (data.user) {
-      await sb.from("businesses").insert({
-        owner_id: data.user.id, business_name: form.businessName,
-        owner_name: form.ownerName, phone: form.phone, city: form.city
+    try {
+      const data = await api("/api/auth/signup", "POST", {
+        email: form.email, password: form.password,
+        businessName: form.businessName, ownerName: form.ownerName,
+        phone: form.phone, city: form.city
       });
+      localStorage.setItem("gsl_token", data.token);
+      onAuth(data.business);
+    } catch (err) {
+      setError(err.message);
     }
     setLoading(false);
   };
@@ -150,8 +123,8 @@ const AuthScreen = ({ onBack }) => {
             <rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f" /><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6" />
           </svg>
         </div>
-        <div style={{ color: "#fff", fontWeight: 900, fontSize: 24, letterSpacing: 3 }}>STONETRACK</div>
-        <div style={{ color: "#93c5fd", fontSize: 12, letterSpacing: 1.5, marginTop: 4 }}>MARBLE & GRANITE MANAGEMENT</div>
+        <div style={{ color: "#fff", fontWeight: 900, fontSize: 24, letterSpacing: 3 }}>GETSTOCKLOG</div>
+        <div style={{ color: "#93c5fd", fontSize: 12, letterSpacing: 1.5, marginTop: 4 }}>STOCK MARBLE & GRANITE MANAGEMENT INVENTORY MANAGEMENT</div>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(0,0,0,0.3)" }}>
@@ -188,7 +161,7 @@ const AuthScreen = ({ onBack }) => {
 
         <button onClick={mode === "login" ? handleLogin : handleSignup} disabled={loading}
           style={{ width: "100%", marginTop: 20, background: loading ? "#94a3b8" : "#1e3a5f", color: "#fff", border: "none", borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "'DM Sans',sans-serif" }}>
-          {loading ? "Please wait..." : mode === "login" ? "Login to StoneTrack" : "Create My Account"}
+          {loading ? "Please wait..." : mode === "login" ? "Login to GetStockLog" : "Create My Account"}
         </button>
 
         {mode === "signup" && <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 14, lineHeight: 1.6 }}>
@@ -259,7 +232,7 @@ const QRLabel = ({ slab, onClose }) => (
         <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: 6, width: 30, height: 30, cursor: "pointer", fontSize: 14, color: "#64748b" }}>✕</button>
       </div>
       <div style={{ border: "2.5px solid #1e3a5f", borderRadius: 10, padding: 20, background: "#f8faff", textAlign: "center" }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 3, marginBottom: 6 }}>STONETRACK</div>
+        <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", letterSpacing: 3, marginBottom: 6 }}>GETSTOCKLOG</div>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><QRCode value={slab.barcode} size={130} /></div>
         <div style={{ fontWeight: 900, fontSize: 17, color: "#1e3a5f", marginBottom: 2 }}>{slab.name}</div>
         <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>{slab.variety} · {slab.type} · {slab.finish}</div>
@@ -343,12 +316,11 @@ const StaffPinLogin = ({ onSuccess }) => {
     setPin(next);
     if (next.length === 4) {
       setLoading(true); setError("");
-      // Find business with this staff PIN
-      const { data } = await sb.from("businesses").select("*").eq("staff_pin", next).single();
-      if (data) {
-        setBizName(data.business_name);
-        setTimeout(() => { onSuccess(data); setLoading(false); }, 500);
-      } else {
+      try {
+        const data = await api("/api/auth/staff-login", "POST", { pin: next });
+        setBizName(data.business.business_name);
+        setTimeout(() => { onSuccess(data.business); setLoading(false); }, 500);
+      } catch {
         setError("Wrong PIN. Try again.");
         setPin(""); setLoading(false);
       }
@@ -361,7 +333,7 @@ const StaffPinLogin = ({ onSuccess }) => {
       <div style={{ width: 44, height: 44, background: "#fff", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
         <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
       </div>
-      <div style={{ color: "#fff", fontWeight: 800, fontSize: 20, letterSpacing: 2, marginBottom: 4 }}>STONETRACK</div>
+      <div style={{ color: "#fff", fontWeight: 800, fontSize: 20, letterSpacing: 2, marginBottom: 4 }}>GETSTOCKLOG</div>
       <div style={{ color: "#64748b", fontSize: 12, marginBottom: 32 }}>STAFF ACCESS</div>
       <div style={{ background: "#1a2f4a", borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 300 }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -399,7 +371,7 @@ function StaffApp({ business, onExit }) {
   const notify = (msg, type = "success") => { setNotif({ msg, type }); setTimeout(() => setNotif(null), 3000); };
 
   useEffect(() => {
-    sb.from("slabs").select("*").eq("business_id", business.id).order("name").then(({ data }) => { setSlabs(data || []); setLoading(false); });
+    api("/api/slabs").then(data => { setSlabs(data || []); setLoading(false); }).catch(() => setLoading(false));
   }, [business.id]);
 
   const filtered = slabs.filter(s =>
@@ -410,7 +382,7 @@ function StaffApp({ business, onExit }) {
   const markDispatched = async (slab) => {
     const newQty = Math.max(0, slab.qty - 1);
     const newStatus = getStatus(newQty, slab.threshold);
-    await sb.from("slabs").update({ qty: newQty, status: newStatus, reserved_for: null }).eq("id", slab.id);
+    await api(`/api/slabs/${slab.id}`, "PUT", { ...slab, qty: newQty, status: newStatus, reserved_for: null });
     setSlabs(p => p.map(s => s.id === slab.id ? { ...s, qty: newQty, status: newStatus, reserved_for: null } : s));
     setDispatchTarget(null);
     notify(`✓ ${slab.name} marked as dispatched`);
@@ -418,7 +390,7 @@ function StaffApp({ business, onExit }) {
 
   const reserveSlab = async () => {
     if (!reserveName.trim()) return;
-    await sb.from("slabs").update({ reserved_for: reserveName }).eq("id", reserveTarget.id);
+    await api(`/api/slabs/${reserveTarget.id}`, "PUT", { ...reserveTarget, reserved_for: reserveName });
     setSlabs(p => p.map(s => s.id === reserveTarget.id ? { ...s, reserved_for: reserveName } : s));
     setReserveTarget(null); setReserveName("");
     notify(`Reserved for ${reserveName}`);
@@ -440,7 +412,7 @@ function StaffApp({ business, onExit }) {
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
             </div>
             <div>
-              <div style={{ color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>STONETRACK</div>
+              <div style={{ color: "#fff", fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>GETSTOCKLOG</div>
               <div style={{ color: "#93c5fd", fontSize: 9, letterSpacing: 1 }}>{business.business_name} · STAFF</div>
             </div>
           </div>
@@ -542,38 +514,46 @@ function StaffApp({ business, onExit }) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function StoneTrack() {
-  const [session, setSession] = useState(null);
+export default function GetStockLog() {
   const [business, setBusiness] = useState(null);
   const [appLoading, setAppLoading] = useState(true);
-  const [loginMode, setLoginMode] = useState("choose"); // choose | owner | staff
+  const [loginMode, setLoginMode] = useState("choose");
   const [staffBusiness, setStaffBusiness] = useState(null);
 
   useEffect(() => {
-    sb.auth.getSession().then(({ data: { session } }) => { setSession(session); if (!session) setAppLoading(false); });
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => { setSession(session); if (!session) { setBusiness(null); setAppLoading(false); } });
-    return () => subscription.unsubscribe();
+    const token = localStorage.getItem("gsl_token");
+    if (!token) { setAppLoading(false); return; }
+    api("/api/business").then(biz => {
+      setBusiness(biz);
+      setAppLoading(false);
+    }).catch(() => {
+      localStorage.removeItem("gsl_token");
+      setAppLoading(false);
+    });
   }, []);
 
-  useEffect(() => {
-    if (session) loadBusiness();
-  }, [session]);
-
-  const loadBusiness = async () => {
-    const { data } = await sb.from("businesses").select("*").eq("owner_id", session.user.id).single();
-    setBusiness(data);
-    setAppLoading(false);
+  const handleAuth = (biz) => {
+    setBusiness(biz);
+    setLoginMode("choose");
   };
 
-  // Staff logged in via PIN
+  const handleLogout = () => {
+    localStorage.removeItem("gsl_token");
+    setBusiness(null);
+    setLoginMode("choose");
+  };
+
+  const loadBusiness = async () => {
+    const biz = await api("/api/business");
+    setBusiness(biz);
+  };
+
   if (staffBusiness) return <StaffApp business={staffBusiness} onExit={() => setStaffBusiness(null)} />;
+  if (appLoading) return <Loader msg="Loading GetStockLog..." />;
 
-  if (appLoading) return <Loader msg="Loading StoneTrack..." />;
-
-  // Not logged in — show choose screen
-  if (!session) {
+  if (!business) {
     if (loginMode === "staff") return <StaffPinLogin onSuccess={biz => setStaffBusiness(biz)} />;
-    if (loginMode === "owner") return <AuthScreen onBack={() => setLoginMode("choose")} />;
+    if (loginMode === "owner") return <AuthScreen onBack={() => setLoginMode("choose")} onAuth={handleAuth} />;
 
     // Choose screen
     return (
@@ -582,8 +562,8 @@ export default function StoneTrack() {
         <div style={{ width: 56, height: 56, background: "#fff", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
           <svg width="32" height="32" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
         </div>
-        <div style={{ color: "#fff", fontWeight: 900, fontSize: 26, letterSpacing: 3, marginBottom: 4 }}>STONETRACK</div>
-        <div style={{ color: "#93c5fd", fontSize: 12, letterSpacing: 1.5, marginBottom: 48 }}>MARBLE & GRANITE MANAGEMENT</div>
+        <div style={{ color: "#fff", fontWeight: 900, fontSize: 26, letterSpacing: 3, marginBottom: 4 }}>GETSTOCKLOG</div>
+        <div style={{ color: "#93c5fd", fontSize: 12, letterSpacing: 1.5, marginBottom: 48 }}>STOCK MARBLE & GRANITE MANAGEMENT INVENTORY MANAGEMENT</div>
 
         <div style={{ width: "100%", maxWidth: 340, display: "flex", flexDirection: "column", gap: 14 }}>
           <button onClick={() => setLoginMode("owner")}
@@ -618,12 +598,11 @@ export default function StoneTrack() {
     );
   }
 
-  if (!business) return <Loader msg="Setting up your account..." />;
-  return <OwnerApp session={session} business={business} onRefreshBusiness={loadBusiness} />;
+  return <OwnerApp business={business} onRefreshBusiness={loadBusiness} onLogout={handleLogout} />;
 }
 
 // ─── OWNER APP ────────────────────────────────────────────────────────────────
-function OwnerApp({ session, business, onRefreshBusiness }) {
+function OwnerApp({ business, onRefreshBusiness, onLogout }) {
   const [slabs, setSlabs] = useState([]);
   const [sales, setSales] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -667,15 +646,17 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
   // ── LOAD ALL DATA ──
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: sl }, { data: sa }, { data: cu }] = await Promise.all([
-      sb.from("slabs").select("*").eq("business_id", business.id).order("created_at"),
-      sb.from("sales").select("*").eq("business_id", business.id).order("created_at", { ascending: false }),
-      sb.from("customers").select("*").eq("business_id", business.id).order("name"),
-    ]);
-    setSlabs(sl || []);
-    setSales(sa || []);
-    setCustomers(cu || []);
-    if ((sl || []).length === 0) setShowWelcome(true);
+    try {
+      const [sl, sa, cu] = await Promise.all([
+        api("/api/slabs"),
+        api("/api/sales"),
+        api("/api/customers"),
+      ]);
+      setSlabs(sl || []);
+      setSales(sa || []);
+      setCustomers(cu || []);
+      if ((sl || []).length === 0) setShowWelcome(true);
+    } catch (err) { notify(err.message, "error"); }
     setLoading(false);
   }, [business.id]);
 
@@ -689,17 +670,19 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     const totalQty = slabCount * sqftPerSlab;
     const threshold = +ns.threshold;
     const barcode = `ST-${String(slabs.length + 1).padStart(3, "0")}`;
-    const { data, error } = await sb.from("slabs").insert({
-      business_id: business.id, name: ns.name, type: ns.type || invCat, variety: ns.variety, finish: ns.finish,
-      length: +ns.length, width: +ns.width, sqft: sqftPerSlab, qty: totalQty, price_per_sqft: +ns.pricePerSqft,
-      cost_per_sqft: +ns.costPerSqft || 0, block: ns.block, row_no: +ns.row, slot_no: +ns.slot,
-      threshold, supplier: ns.supplier, barcode, status: getStatus(totalQty, threshold)
-    }).select().single();
-    if (error) { notify(error.message, "error"); return; }
-    setSlabs(p => [...p, data]);
-    setAddSlabOpen(false);
-    setNs({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", sqft: "", slabs: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
-    notify(`${data.name} added! ${slabCount} slabs × ${sqftPerSlab} sqft = ${totalQty} sqft total`);
+    try {
+      const data = await api("/api/slabs", "POST", {
+        name: ns.name, type: ns.type, variety: ns.variety, finish: ns.finish,
+        length: +ns.length, width: +ns.width, sqft: sqftPerSlab, qty: totalQty,
+        price_per_sqft: +ns.pricePerSqft, cost_per_sqft: +ns.costPerSqft || 0,
+        block: ns.block, row_no: +ns.row, slot_no: +ns.slot,
+        threshold, supplier: ns.supplier, barcode
+      });
+      setSlabs(p => [...p, data]);
+      setAddSlabOpen(false);
+      setNs({ name: "", type: "Marble", variety: "Indian", finish: "Polished", length: "", width: "", sqft: "", slabs: "", pricePerSqft: "", costPerSqft: "", block: "A", row: 1, slot: 1, threshold: 3, supplier: "" });
+      notify(`${data.name} added! ${slabCount} slabs × ${sqftPerSlab} sqft = ${totalQty} sqft total`);
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── RECORD SALE ──
@@ -708,35 +691,33 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     const slab = slabs.find(s => s.id === saleTarget.id);
     const sqftSold = +sf.sqftSold;
     if (sqftSold > slab.qty) { notify("Not enough sq.ft in stock!", "error"); return; }
-    const nq = slab.qty - sqftSold;
-    const newStatus = getStatus(nq, slab.threshold);
     const inv = `INV-${String(sales.length + 1).padStart(3, "0")}`;
-    const [{ error: slabErr }, { data: newSale, error: saleErr }] = await Promise.all([
-      sb.from("slabs").update({ qty: nq, status: newStatus }).eq("id", slab.id),
-      sb.from("sales").insert({
-        business_id: business.id, slab_id: slab.id, slab_name: slab.name, date: today,
-        sqft_sold: sqftSold, slabs_used: 1, price_per_sqft: slab.price_per_sqft,
-        cost_per_sqft: slab.cost_per_sqft, wastage: +sf.wastage || 0,
-        customer: sf.customer || "Walk-in", phone: sf.phone, gst_no: sf.gstNo,
-        invoice_no: inv, delivery_status: "Pending", paid_amount: +sf.paidAmount || 0, payment_mode: sf.paymentMode
-      }).select().single()
-    ]);
-    if (slabErr || saleErr) { notify("Error recording sale", "error"); return; }
-    setSlabs(p => p.map(s => s.id === slab.id ? { ...s, qty: nq, status: newStatus } : s));
-    setSales(p => [newSale, ...p]);
-    setSaleTarget(null); setSf({ sqftSold: "", customer: "", phone: "", wastage: "5", gstNo: "", paymentMode: "Cash", paidAmount: "" });
-    notify(`Sale done! Invoice: ${inv}`);
+    try {
+      const result = await api("/api/sales", "POST", {
+        slab_id: slab.id, slab_name: slab.name, sqft_sold: sqftSold,
+        price_per_sqft: slab.price_per_sqft, cost_per_sqft: slab.cost_per_sqft,
+        wastage: +sf.wastage || 0, customer: sf.customer || "Walk-in",
+        phone: sf.phone, gst_no: sf.gstNo, invoice_no: inv,
+        paid_amount: +sf.paidAmount || 0, payment_mode: sf.paymentMode
+      });
+      setSlabs(p => p.map(s => s.id === slab.id ? { ...s, qty: result.newQty, status: result.status } : s));
+      setSales(p => [result.sale, ...p]);
+      setSaleTarget(null);
+      setSf({ sqftSold: "", customer: "", phone: "", wastage: "5", gstNo: "", paymentMode: "Cash", paidAmount: "" });
+      notify(`Sale done! Invoice: ${inv}`);
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── RECORD PAYMENT ──
   const recordPayment = async () => {
     if (!payForm.amount || +payForm.amount <= 0) { notify("Enter valid amount", "error"); return; }
     const newPaid = (paymentTarget.paid_amount || 0) + +payForm.amount;
-    const { error } = await sb.from("sales").update({ paid_amount: newPaid, payment_mode: payForm.mode }).eq("id", paymentTarget.id);
-    if (error) { notify(error.message, "error"); return; }
-    setSales(p => p.map(s => s.id === paymentTarget.id ? { ...s, paid_amount: newPaid, payment_mode: payForm.mode } : s));
-    setPaymentTarget(null); setPayForm({ amount: "", mode: "Cash", note: "" });
-    notify("Payment recorded!");
+    try {
+      await api(`/api/sales/${paymentTarget.id}/payment`, "PUT", { paid_amount: newPaid, payment_mode: payForm.mode });
+      setSales(p => p.map(s => s.id === paymentTarget.id ? { ...s, paid_amount: newPaid, payment_mode: payForm.mode } : s));
+      setPaymentTarget(null); setPayForm({ amount: "", mode: "Cash", note: "" });
+      notify("Payment recorded!");
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── RECORD DAMAGE ──
@@ -744,54 +725,56 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
     if (!damageForm.qty || +damageForm.qty <= 0) { notify("Enter qty", "error"); return; }
     const newQty = Math.max(0, damageTarget.qty - +damageForm.qty);
     const newStatus = getStatus(newQty, damageTarget.threshold);
-    const { error } = await sb.from("slabs").update({ qty: newQty, status: newStatus }).eq("id", damageTarget.id);
-    if (error) { notify(error.message, "error"); return; }
-    setSlabs(p => p.map(s => s.id === damageTarget.id ? { ...s, qty: newQty, status: newStatus } : s));
-    setDamageTarget(null); setDamageForm({ qty: "1", reason: "" });
-    notify("Damage recorded. Stock updated.");
+    try {
+      await api(`/api/slabs/${damageTarget.id}`, "PUT", { ...damageTarget, qty: newQty, status: newStatus });
+      setSlabs(p => p.map(s => s.id === damageTarget.id ? { ...s, qty: newQty, status: newStatus } : s));
+      setDamageTarget(null); setDamageForm({ qty: "1", reason: "" });
+      notify("Damage recorded. Stock updated.");
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── DELETE SLAB ──
   const deleteSlab = async (id) => {
-    await sb.from("slabs").delete().eq("id", id);
-    setSlabs(p => p.filter(s => s.id !== id));
-    notify("Slab removed");
+    try {
+      await api(`/api/slabs/${id}`, "DELETE");
+      setSlabs(p => p.filter(s => s.id !== id));
+      notify("Slab removed");
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── SAVE EDIT SLAB ──
   const saveEditSlab = async () => {
-    const status = getStatus(editSlabData.qty, editSlabData.threshold);
-    const { error } = await sb.from("slabs").update({
-      name: editSlabData.name, type: editSlabData.type, variety: editSlabData.variety,
-      finish: editSlabData.finish, length: editSlabData.length, width: editSlabData.width,
-      qty: editSlabData.qty, price_per_sqft: editSlabData.price_per_sqft,
-      cost_per_sqft: editSlabData.cost_per_sqft, block: editSlabData.block,
-      row_no: editSlabData.row_no, slot_no: editSlabData.slot_no,
-      threshold: editSlabData.threshold, supplier: editSlabData.supplier, status
-    }).eq("id", editSlabData.id);
-    if (error) { notify(error.message, "error"); return; }
-    setSlabs(p => p.map(s => s.id === editSlabData.id ? { ...editSlabData, status } : s));
-    setEditSlabData(null); notify("Updated!");
+    try {
+      const updated = await api(`/api/slabs/${editSlabData.id}`, "PUT", editSlabData);
+      setSlabs(p => p.map(s => s.id === editSlabData.id ? updated : s));
+      setEditSlabData(null); notify("Updated!");
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── RESERVE SLAB ──
   const reserveSlab = async () => {
     if (!rf.customer) { notify("Enter name", "error"); return; }
-    await sb.from("slabs").update({ reserved_for: rf.customer }).eq("id", reserveTarget.id);
-    setSlabs(p => p.map(s => s.id === reserveTarget.id ? { ...s, reserved_for: rf.customer } : s));
-    setReserveTarget(null); setRf({ customer: "", phone: "", days: "7" });
-    notify(`Reserved for ${rf.customer}`);
+    try {
+      await api(`/api/slabs/${reserveTarget.id}`, "PUT", { ...reserveTarget, reserved_for: rf.customer });
+      setSlabs(p => p.map(s => s.id === reserveTarget.id ? { ...s, reserved_for: rf.customer } : s));
+      setReserveTarget(null); setRf({ customer: "", phone: "", days: "7" });
+      notify(`Reserved for ${rf.customer}`);
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── ADD CUSTOMER ──
   const addCustomer = async () => {
     if (!nc.name) { notify("Enter name", "error"); return; }
-    const { data, error } = await sb.from("customers").insert({ business_id: business.id, name: nc.name, phone: nc.phone, email: nc.email, type: nc.type, gst_no: nc.gstNo, credit_limit: +nc.creditLimit || 0, notes: nc.notes }).select().single();
-    if (error) { notify(error.message, "error"); return; }
-    setCustomers(p => [...p, data]);
-    setAddCustOpen(false);
-    setNc({ name: "", phone: "", email: "", type: "Contractor", gstNo: "", creditLimit: "", notes: "" });
-    notify("Account created!");
+    try {
+      const data = await api("/api/customers", "POST", {
+        name: nc.name, phone: nc.phone, email: nc.email, type: nc.type,
+        gst_no: nc.gstNo, credit_limit: +nc.creditLimit || 0, notes: nc.notes
+      });
+      setCustomers(p => [...p, data]);
+      setAddCustOpen(false);
+      setNc({ name: "", phone: "", email: "", type: "Contractor", gstNo: "", creditLimit: "", notes: "" });
+      notify("Account created!");
+    } catch (err) { notify(err.message, "error"); }
   };
 
   // ── STATS ──
@@ -865,7 +848,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f" /><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f" /><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f" /><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6" /></svg>
               </div>
               <div>
-                <div style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: 2, lineHeight: 1.1 }}>STONETRACK</div>
+                <div style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: 2, lineHeight: 1.1 }}>GETSTOCKLOG</div>
                 <div style={{ color: "#93c5fd", fontSize: 9, letterSpacing: 1.5 }}>{business.business_name.toUpperCase()}</div>
               </div>
             </div>
@@ -876,7 +859,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 Staff PIN
               </button>
-              <button onClick={() => sb.auth.signOut()} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34 }}>🔒 Logout</button>
+              <button onClick={onLogout} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 34 }}>🔒 Logout</button>
             </div>
           </div>
           <div className="hide-mobile" style={{ overflowX: "auto", gap: 0 }}>
@@ -1047,7 +1030,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
                             <Btn sm ch="Sell" onClick={() => setSaleTarget(s)} />
                             <Btn sm ch="QR" v="g" onClick={() => setPrintTarget(s)} />
                             <Btn sm ch="Edit" v="g" onClick={() => setEditSlabData({ ...s })} />
-                            <Btn sm ch="🗑" v="d" onClick={async () => { if (window.confirm(`Delete "${s.name}"?`)) { await sb.from("slabs").delete().eq("id", s.id); setSlabs(p => p.filter(x => x.id !== s.id)); notify("Deleted"); } }} />
+                            <Btn sm ch="🗑" v="d" onClick={async () => { if (window.confirm(`Delete "${s.name}"?`)) { await deleteSlab(s.id); } }} />
                           </div></td>
                         </tr>);
                       })}</tbody>
@@ -1573,7 +1556,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               <button onClick={() => setStaffPinOpen(false)} style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: 8, padding: 13, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
               <button onClick={async () => {
                 if (newStaffPin.length !== 4) { notify("Enter exactly 4 digits", "error"); return; }
-                await sb.from("businesses").update({ staff_pin: newStaffPin }).eq("id", business.id);
+                await api("/api/business", "PUT", { ...business, staff_pin: newStaffPin });
                 business.staff_pin = newStaffPin;
                 setStaffPinOpen(false); setNewStaffPin("");
                 notify(`✓ Staff PIN set to ${newStaffPin}`);
@@ -1591,7 +1574,7 @@ function OwnerApp({ session, business, onRefreshBusiness }) {
               <div style={{ width: 52, height: 52, background: "#fff", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
                 <svg width="28" height="28" viewBox="0 0 20 20" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="1" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="1" y="11" width="8" height="8" rx="1" fill="#1e3a5f"/><rect x="11" y="11" width="8" height="8" rx="1" fill="#3b82f6"/></svg>
               </div>
-              <div style={{ color: "#fff", fontWeight: 900, fontSize: 22, marginBottom: 6 }}>Welcome to StoneTrack! 🎉</div>
+              <div style={{ color: "#fff", fontWeight: 900, fontSize: 22, marginBottom: 6 }}>Welcome to GetStockLog! 🎉</div>
               <div style={{ color: "#93c5fd", fontSize: 13 }}>Let's get your inventory set up in 3 easy steps</div>
             </div>
             <div style={{ padding: "24px 28px" }}>
